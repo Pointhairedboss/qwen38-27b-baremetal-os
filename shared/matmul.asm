@@ -41,7 +41,9 @@ default rel
 %define Q8_PREFETCH prefetcht0
 %endif
 
+%ifndef Q8_MAX_K
 %define Q8_MAX_K 16384
+%endif
 
 section .text
 

@@ -76,7 +76,7 @@ TRAIN_OBJS := \
 	$(TRAIN_BUILD)/tui.o \
 	$(TRAIN_BUILD)/main.o
 
-.PHONY: all inference test-math check os os-check os-iso os-run train train-check check-all clean
+.PHONY: asm-qwen35 all inference test-math check os os-check os-iso os-run os27-bartest os27-bartest-run os27 os27-run os27-iso train train-check check-all clean
 
 all: inference $(TEST) os train
 
@@ -154,6 +154,84 @@ os-run: $(OS_ELF)
 	qemu-system-x86_64 -enable-kvm -cpu host -m $(RAM) -smp $(SMP) \
 		-kernel $(OS_ELF) -initrd "$(MODEL)" \
 		-append '$(CMDLINE)' -nographic
+
+# --- Qwen3.5/3.8 hybrid: Linux user-space driver (M2/M3 validation) ---
+Q35_BUILD  := $(BUILD)/q35
+Q35_TARGET := $(BUILD)/asm-qwen35
+Q35_AFLAGS := -f elf64 -DFAST_Q8=$(FAST_Q8) -DQ8_MAX_K=32768 -I$(SHARED_DIR)/
+Q35_OBJS := $(addprefix $(Q35_BUILD)/,syscalls.o math.o matmul.o threads.o tokenizer.o transformer.o qwen35.o linux_main.o)
+
+$(Q35_BUILD):
+	mkdir -p $(Q35_BUILD)
+
+$(Q35_BUILD)/%.o: $(SHARED_DIR)/%.asm $(SHARED_DIR)/constants.inc $(SHARED_DIR)/qwen35.inc $(FAST_Q8_STAMP) | $(Q35_BUILD)
+	$(NASM) $(Q35_AFLAGS) $< -o $@
+
+$(Q35_BUILD)/linux_main.o: 04-qwen38-27b-os/linux_main.asm $(SHARED_DIR)/constants.inc $(SHARED_DIR)/qwen35.inc | $(Q35_BUILD)
+	$(NASM) $(Q35_AFLAGS) $< -o $@
+
+$(Q35_TARGET): $(Q35_OBJS)
+	$(LD) $(LDFLAGS) $(Q35_OBJS) -o $@
+
+asm-qwen35: $(Q35_TARGET)
+
+# --- Phase 4: Qwen3.8-27B bare-metal OS (model via ivshmem 64-bit PCI BAR) ---
+P4_DIR      := 04-qwen38-27b-os
+OS27_BUILD  := $(BUILD)/os27
+OS27_AFLAGS := -f elf64 -DBARE_METAL -DFAST_Q8=$(FAST_Q8) -DQ8_MAX_K=32768 -I$(SHARED_DIR)/ -I$(P4_DIR)/
+OS27_LDFLAGS := -m elf_x86_64 -T $(P4_DIR)/linker.ld --gc-sections -s -z max-page-size=0x1000 -z noexecstack
+MODEL27     ?= models/qwen38-27b-q8_0.asmbin
+SMP27       ?= 32
+RAM27       ?= 8G
+BAR27       ?= $(shell f="$(MODEL27)"; [ -f "$$f" ] && stat -c %s "$$f")
+HOLE64      ?= 128G
+
+OS27_BASE_OBJS := $(OS27_BUILD)/boot.o $(OS27_BUILD)/drivers.o $(OS27_BUILD)/runtime.o \
+	$(OS27_BUILD)/smp.o $(OS27_BUILD)/paging.o $(OS27_BUILD)/pci.o
+BARTEST_ELF := $(BUILD)/asm-llm-os27-bartest.elf
+
+OS27_QEMU = qemu-system-x86_64 -enable-kvm -machine q35 -cpu host -m $(RAM27) -smp $(SMP27) \
+	-global q35-pcihost.pci-hole64-size=$(HOLE64) \
+	-object memory-backend-file,id=mdl,mem-path=$(MODEL27),size=$(BAR27),share=on,readonly=on \
+	-device ivshmem-plain,memdev=mdl -nographic
+
+$(OS27_BUILD):
+	mkdir -p $(OS27_BUILD)
+
+$(OS27_BUILD)/%.o: $(P4_DIR)/%.asm $(P4_DIR)/os_constants.inc $(SHARED_DIR)/constants.inc | $(OS27_BUILD)
+	$(NASM) $(OS27_AFLAGS) $< -o $@
+
+$(BARTEST_ELF): $(OS27_BASE_OBJS) $(OS27_BUILD)/bartest.o $(P4_DIR)/linker.ld
+	$(LD) $(OS27_LDFLAGS) $(OS27_BASE_OBJS) $(OS27_BUILD)/bartest.o -o $@.64
+	$(OBJCOPY) -O elf32-i386 $@.64 $@
+
+os27-bartest: $(BARTEST_ELF)
+
+os27-bartest-run: $(BARTEST_ELF)
+	$(OS27_QEMU) -kernel $(BARTEST_ELF) -append '$(CMDLINE)'
+
+OS27_ELF  := $(BUILD)/asm-llm-os27.elf
+OS27_ISO  := $(BUILD)/asm-llm-os27.iso
+OS27_OBJS := $(OS27_BASE_OBJS) $(addprefix $(OS27_BUILD)/,math.o matmul.o tokenizer.o transformer.o qwen35.o kernel.o)
+
+$(OS27_BUILD)/%.o: $(SHARED_DIR)/%.asm $(SHARED_DIR)/constants.inc $(SHARED_DIR)/qwen35.inc $(FAST_Q8_STAMP) | $(OS27_BUILD)
+	$(NASM) $(OS27_AFLAGS) $< -o $@
+
+$(OS27_BUILD)/kernel.o: $(SHARED_DIR)/qwen35.inc
+
+$(OS27_ELF): $(OS27_OBJS) $(P4_DIR)/linker.ld
+	$(LD) $(OS27_LDFLAGS) $(OS27_OBJS) -o $@.64
+	$(OBJCOPY) -O elf32-i386 $@.64 $@
+
+os27: $(OS27_ELF)
+
+os27-run: $(OS27_ELF)
+	$(OS27_QEMU) -kernel $(OS27_ELF) -append '$(CMDLINE)'
+
+# Kernel-only ISO (the model never fits ISO9660; it always arrives via ivshmem)
+os27-iso: $(OS27_ELF)
+	ISO_TITLE="asm-llm OS v4 (Qwen3.5/3.8 hybrid, model via ivshmem)" \
+		bash scripts/mkiso.sh "$(OS27_ELF)" "" "$(OS27_ISO)" '$(CMDLINE)'
 
 # --- Phase 3 Targets ---
 $(TRAIN_BUILD):
