@@ -1,17 +1,31 @@
-# llm.asm
+# qwen38-27b-baremetal-os
 
-**Three complete LLM projects written in 100% pure x86-64 NASM assembly.**
+**Qwen3.8-27B running as a bare-metal OS on KVM, in 100% pure x86-64 NASM assembly.**
+
+This repository extends [alesha-pro/llm.asm](https://github.com/alesha-pro/llm.asm) with **Phase 4: [04-qwen38-27b-os/](04-qwen38-27b-os/)**. It's a 33 KB Multiboot kernel that boots straight into a multi-turn chat with **Qwen/Qwen3.8-27B**, Qwen's hybrid architecture with 48 Gated DeltaNet layers and 16 gated full-attention layers. The 28.6 GB Q8_0 weights reach the guest zero-copy as a read-only ivshmem PCI BAR backed by the host file. Output is byte-exact against the Linux build of the same code at 1–32 vCPUs.
+
+```bash
+make os27
+make os27-run MODEL27=models/qwen38-27b-q8_0.asmbin SMP27=16   # -> asm-llm> chat on the serial console
+```
+
+The original three projects from llm.asm are kept unchanged below; Phase 2's kernel still builds byte-identical.
+
+---
+
+**Four complete LLM projects written in 100% pure x86-64 NASM assembly.**
 Zero C, zero C++, zero Rust, zero libc, zero libm, zero runtime dependencies.
 
-Assembled directly with `nasm` and linked with `ld`. Every math kernel (`expf`, `sincosf`, `RMSNorm`, `RoPE`, `SiLU`, `Softmax`), AVX2+FMA+F16C GEMM/GEMV engine, BPE tokenizer, `clone()`/`futex()` thread pool, bare-metal SMP kernel, analytical backward pass, AdamW optimizer, and live Unicode Braille TUI is hand-written x86-64 assembly (`17,252` lines total across all three projects).
+Assembled directly with `nasm` and linked with `ld`. Every math kernel (`expf`, `sincosf`, `RMSNorm`, `RoPE`, `SiLU`, `Softmax`), AVX2+FMA+F16C GEMM/GEMV engine, BPE tokenizer, `clone()`/`futex()` thread pool, bare-metal SMP kernel, analytical backward pass, AdamW optimizer, and live Unicode Braille TUI is hand-written x86-64 assembly (`17,252` lines across the original three projects, plus ~7,500 lines for Phase 4).
 
-## The Trilogy
+## The Projects
 
 | Project | Binary | Size | Deps | Key Numbers |
 |---|---|---:|---:|---|
 | **[01-qwen3-inference/](01-qwen3-inference/)** | `build/asm-llm` | **14,712 B** *(14,008 B `FAST_Q8=0`)* | **0** | Static Linux ELF running `Qwen/Qwen3-0.6B` (Q8_0, built-in BPE tokenizer, GQA + QK-Norm + RoPE + SwiGLU, single-shot & `--chat` multi-turn KV-cache REPL). **`FAST_Q8=1` (default):** **126.8 tok/s** decode at 40T (**20.7 tok/s** at 1T), **+18% to +36% faster than `llama.cpp` CPU (`Q8_0`) across 1..40T**, **`0.99965`** cosine & **64/64** exact greedy tokens vs PyTorch FP32. |
 | **[02-baremetal-os/](02-baremetal-os/)** | `build/asm-llm-os.elf` | **24,252 B** *(23,612 B `FAST_Q8=0`)* | **0** | Bootable bare-metal `Qwen3-0.6B` OS with no Linux or Windows. Multiboot 1 -> Long Mode -> AVX2/FMA/F16C -> ACPI/APIC SMP -> VGA + PS/2 + COM1 multi-turn KV-cache chat (`/clear`, `/think`, `/bench`). **74–94 ms** boot, **134.9 tok/s** KVM EPYC (**23.7 tok/s** 1 vCPU, **136.6 tok/s** peak), **55.4 tok/s** live on Proxmox Xeon E5-2670 v3 with **0 GB** disk. |
 | **[03-minigpt-train/](03-minigpt-train/)** | `build/asm-gpt-train` | **32,944 B** | **0** | From-scratch FP32 Mini-GPT trainer and sampler. Register-blocked `6x16` AVX2+FMA SGEMM, full analytical backward pass (**`1.0000000000`** cosine across all 21 gradient tensors vs PyTorch CPU), decoupled AdamW, **27,662 train tok/s**, live 80x24 Braille TUI, `val_loss 4.19 -> 1.51` on TinyShakespeare in 4 min. |
+| **[04-qwen38-27b-os/](04-qwen38-27b-os/)** | `build/asm-llm-os27.elf` | **33,052 B** | **0** | Bootable bare-metal **Qwen3.8-27B** (Qwen3.5 hybrid: Gated DeltaNet + gated attention, partial RoPE, 248k vocab) OS. RAM above 4 GiB is mapped with 1 GiB pages; the 28.6 GB Q8_0 model arrives zero-copy via the **ivshmem 64-bit PCI BAR**. **~80 ms** boot, **3.6 tok/s** decode at 16 vCPUs (memory-bandwidth bound, Ryzen AI Max+ 395). Byte-exact vs the Linux build `build/asm-qwen35` at 1/8/16/32 vCPUs, including multi-turn chat, `/clear` and context-full resets. |
 
 ---
 
@@ -79,8 +93,8 @@ Measured on the same machine (**AMD EPYC 7642**, 47C online, 256 MiB L3, DDR4, C
 Clone the repo and build everything with `make all`:
 
 ```bash
-git clone https://github.com/alesha-pro/llm.asm.git
-cd llm.asm
+git clone https://github.com/mitkox/qwen38-27b-baremetal-os.git
+cd qwen38-27b-baremetal-os
 make all
 ```
 
@@ -121,12 +135,26 @@ make train
 
 Full training, live Braille TUI, checkpoint chat loop, and PyTorch gradient check guide: **[03-minigpt-train/README.md](03-minigpt-train/README.md)**.
 
+### 4. Boot Bare-Metal Qwen3.8-27B OS in 33 KB (`04-qwen38-27b-os/`)
+
+```bash
+# One-time export: HF safetensors -> .asmbin v3 Q8_0 (28.6 GB, sparse-padded to 32 GiB for ivshmem)
+.venv/bin/python -I scripts/export_qwen35.py --model-dir <Qwen3.8-27B dir> --out models/qwen38-27b-q8_0.asmbin --pad-pow2
+make os27 asm-qwen35
+make os27-run MODEL27=models/qwen38-27b-q8_0.asmbin SMP27=16 CMDLINE='max_tokens=256'
+# Kernel-only ISO (the model always comes through ivshmem) + parity suite:
+make os27-iso
+python3 scripts/verify_os27.py --model models/qwen38-27b-q8_0.asmbin --smp 1,8,16,32
+```
+
+The same kernel also runs Qwen3.5-0.8B and 4B, which are handy for fast iteration. Full guide, architecture notes, performance and Proxmox sketch: **[04-qwen38-27b-os/README.md](04-qwen38-27b-os/README.md)**.
+
 ---
 
 ## Repository Layout
 
 ```text
-llm.asm/
+qwen38-27b-baremetal-os/
 ├── LICENSE                        # MIT License
 ├── Makefile                       # Single build file: inference, os, os-iso, train, all, check
 ├── README.md                      # You are here
@@ -140,7 +168,9 @@ llm.asm/
 │   ├── matmul.asm                 # FAST_Q8=1 INT8xINT8 AVX2+F16C & FAST_Q8=0 Q8_0xFP32 matmul, dequant, dot, saxpy
 │   ├── threads.asm                # Zero-libc Linux clone() + hybrid spin/futex thread pool (matmul + GQA attn)
 │   ├── tokenizer.asm              # Fibonacci-hashed BPE encoder, UTF-8 decoder, Qwen3 chat template
-│   └── transformer.asm            # Full 28-layer Qwen3 forward pass (v1/v2 auto-detect, contiguous KV, parallel GQA)
+│   ├── transformer.asm            # Full 28-layer Qwen3 forward pass (v1/v2 auto-detect, contiguous KV, parallel GQA)
+│   ├── qwen35.asm                 # Qwen3.5/3.8 hybrid forward: Gated DeltaNet, gated attention, partial RoPE (.asmbin v3)
+│   └── qwen35.inc                 # .asmbin v3 header + hybrid model context offsets
 ├── 01-qwen3-inference/            # Phase 1: 14 KB static Linux ELF inference engine + --chat (1,251 lines)
 │   ├── README.md
 │   ├── main.asm
@@ -162,9 +192,22 @@ llm.asm/
 │   ├── model.asm                  # Arena layout, deterministic init, full fwd/bwd pass, sampler
 │   ├── tui.asm                    # ioctl(TCGETS) TTY detect + flicker-free 80x24 ANSI/Braille TUI
 │   └── main.asm                   # CLI, auto char-vocab, 90/10 split, .gptckpt I/O, train/sample loop
+├── 04-qwen38-27b-os/              # Phase 4: 33 KB bare-metal Qwen3.8-27B OS, model via ivshmem
+│   ├── README.md
+│   ├── boot.asm, drivers.asm      # From Phase 2 (Multiboot -> Long Mode, COM1/VGA/PS2/PIT/ACPI)
+│   ├── paging.asm                 # Maps all RAM + 64-bit BAR (1 GiB / 2 MiB pages) beyond 4 GiB
+│   ├── pci.asm                    # PCI scan for ivshmem-plain (1AF4:1110), 64-bit BAR2
+│   ├── runtime.asm                # Bump allocator using RAM regions above 4 GiB
+│   ├── smp.asm                    # INIT-SIPI-SIPI + generic tp_run(fn, arg) thread pool
+│   ├── kernel.asm                 # Banner, cmdline, REPL, DeltaNet state reset on every pos-0 restart
+│   ├── linux_main.asm             # Linux build (build/asm-qwen35) for validation and parity
+│   └── bartest.asm                # M0 ivshmem BAR vs RAM bandwidth test kernel
 └── scripts/
     ├── export_weights.py          # Offline HuggingFace Qwen3-0.6B -> .asmbin (Q8_0) converter
-    ├── mkiso.sh                   # Bootable BIOS+UEFI hybrid GRUB Multiboot 1 ISO builder
+    ├── mkiso.sh                   # Bootable BIOS+UEFI hybrid GRUB Multiboot 1 ISO builder (model optional)
+    ├── export_qwen35.py           # HF Qwen3.5/3.8 -> .asmbin v3 (Q8_0, fp16 scales, per-layer offset table)
+    ├── ref_qwen35.py              # Independent NumPy reference reading the same .asmbin v3
+    ├── verify_os27.py             # Phase 4 OS vs Linux parity (batch + multi-turn) and perf table
     ├── test_math.py               # Automated SIMD & math kernel unit test driver
     ├── verify_ref.py              # Independent NumPy Q8_0 + PyTorch FP32 parity harness
     ├── verify_os.py               # Phase 2 parity, SMP determinism, KVM benchmark & VGA capture suite
@@ -182,6 +225,7 @@ llm.asm/
   ```
 - **Phase 1 & 3 runtime:** Any Linux x86-64 kernel. Zero shared libraries (`readelf -d` reports no dynamic section).
 - **Phase 2 runtime (optional):** `qemu-system-x86_64` with KVM, or any x86-64 hypervisor/bare-metal machine (Proxmox VE, VirtualBox, real hardware). Building bootable ISOs uses `grub-mkrescue` (`grub-pc-bin`, `grub-efi-amd64-bin`, `mtools`, `xorriso`).
+- **Phase 4 runtime:** QEMU/KVM with `-machine q35`, a large `pci-hole64-size`, and an `ivshmem-plain` device backed by the model file. The guest needs `-m 8G` (KV cache + DeltaNet state); the host needs enough RAM to keep the 28.6 GB model in page cache (tested with 128 GB).
 - **Offline tooling (optional):** `python3` + `numpy` only for one-time `Qwen3-0.6B` `.asmbin` export and reference verification (`torch` + `transformers` only if running PyTorch parity checks).
 
 ---
@@ -193,15 +237,17 @@ Every phase is built on the same engineering rules: no runtime libraries, determ
 - **Shared assembly core (`shared/`):** Phase 2 compiles the exact same `math.asm`, `matmul.asm`, `tokenizer.asm`, and `transformer.asm` with `-DBARE_METAL` (swapping Linux `mmap`/`clone`/`write` for physical Multiboot modules, APIC spin-barriers, and VGA+COM1 drivers). Phase 3 reuses `syscalls.asm` and `math.asm`.
 - **Phase 1 verification:** All math/SIMD kernels pass unit tests within `1e-7..1e-6` (`init_rope_freqs` FP64 `< 5e-14`) for both `FAST_Q8=1` and `FAST_Q8=0` across v1 FP32 and v2 FP16 scale formats. `FAST_Q8=1` matches PyTorch FP32 `Qwen3-0.6B` with `cosine = 0.9996517` and **64/64 exact greedy tokens** (`FAST_Q8=0` matches the Python Q8_0 reference with `cosine = 1.000000000`). Bit-exact deterministic from `1T` to `40T`.
 - **Phase 2 verification:** **100% token-exact and byte-for-byte identical** to Phase 1 across 5 test prompts (English, Russian UTF-8, arithmetic, `--think` mode), multi-turn KV-cache recall + `/clear`, and across `1..32` KVM vCPUs (`134.9 tok/s` at 16 vCPUs). Verified on both QEMU KVM (AMD EPYC 7642) and a real Proxmox VE VM (Intel Xeon E5-2670 v3, 0 GB disk, BIOS GRUB ISO).
+- **Phase 4 verification:** The Linux build is checked against an independent NumPy reference by teacher-forced top-1 agreement. 27B: **0 mismatches over 47 steps**, worst logits cosine 0.9969. 0.8B and 4B: only near-tie flips. The bare-metal OS is then **byte-exact** against the Linux build (tokens + UTF-8 text) at 1/8/16/32 vCPUs on 0.8B, 4B and 27B. That includes multi-turn recall, `/clear`, `/bench` and repeated context-full resets of the recurrent DeltaNet state.
 - **Phase 3 verification:** Verified against PyTorch FP32 CPU on all **21 parameter tensors** (`worst max_abs_diff = 3.35e-8`, `min cosine_sim = 1.0000000000`), 10-step AdamW + cosine LR + grad-clip trajectory (`max_loss_diff = 4.77e-7`), and bit-exact determinism across `1T`, `8T`, and `16T`.
 
 See each project's README for full tables, memory layouts, and reproduction steps:
 - [01-qwen3-inference/README.md](01-qwen3-inference/README.md)
 - [02-baremetal-os/README.md](02-baremetal-os/README.md)
 - [03-minigpt-train/README.md](03-minigpt-train/README.md)
+- [04-qwen38-27b-os/README.md](04-qwen38-27b-os/README.md)
 
 ---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE). Phases 1–3 and the shared core are by Alexey Fateev ([alesha-pro/llm.asm](https://github.com/alesha-pro/llm.asm)); Phase 4 builds on them.
