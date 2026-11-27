@@ -105,22 +105,30 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
   -fno-tree-loop-distribute-patterns`. The last flag stops GCC turning loops back
   into `memset`/`memcpy` calls, which the kernel does not have.
 
-## 4. What has been verified (build-level only)
+## 4. What has been verified
 
 | Check | Command | Result |
 |---|---|---|
 | Core compiles with kernel flags, zero undefined symbols | `make freestanding` | pass |
 | Core + adapter + shims link against the fork's own `drivers.asm` (Phase 2 and Phase 4); every Glyph import resolves | `make baremetal-link` | pass. Only `g_boot_tsc` (needed by `drivers.asm`, provided by `boot.asm`) remains. |
 | Full link of the **unmodified** Phase 2 and Phase 4 kernels with the fork's linker scripts and ld flags, Glyph entry points kept with `ld -u` | `make kernel-link` | pass. Multiboot magic stays at file offset 4096. The baseline Phase 2 image is 24 252 B, the size the fork's README documents. With Glyph v0.2 it is 77 752 B (`.text` +45.4 KB, `.bss` +118 KB). Phase 4 goes from 33 052 to 86 300 B. |
+| **Boot in a VM.** `build/glyph-os.elf` is the fork's unmodified Phase 2 `boot.asm`, `drivers.asm`, `runtime.asm` and `linker.ld`, plus Glyph and `src/baremetal/glyph_os.c` (`kernel_main`), following the precedent of Phase 4's `bartest`. It boots under QEMU 8.2 (TCG, no KVM) via Multiboot. | `make glyph-os`, `make qemu-run` | pass. 88 KB image with 55 programs embedded. Boots and runs them all in under 1 s. |
+| **Bare-metal conformance.** The kernel boots with `glyph=test`, writes every embedded transcript to COM1 and powers off. The host compares each one byte for byte with the Linux `.expect`. | `make qemu-test` | **55/55 identical** (46 corpus cases and 9 examples), with `-cpu max` (AVX enabled by `boot.asm`) and with `-cpu qemu64` (no AVX). |
+| **VGA and PS/2 path.** Keys sent through the QEMU monitor (`sendkey`) arrive as scancodes on the emulated i8042 and go through the fork's `ps2_try_getc`. Screens are taken with `screendump` from the emulated VGA text buffer. | `make vm-screenshots` | pass. Interactive Turing machine, demo (typing a name with Shift), menu and Rule 110: `docs/screenshots/vm-*.png`. |
 
-**Not verified:** no boot in QEMU or on a P510. QEMU is not installed in this
-environment, and booting would mean adding a call site to `kernel.asm` (G4).
-Phase 4 has not been exercised beyond linking.
+**Not verified:**
+- Nothing has run on P510 hardware.
+- Glyph has not run *inside* the Qwen inference kernel. That needs a model file,
+  which this environment does not have, and the kernel's REPL is only reached after
+  the model loads.
+- Phase 4 has not been exercised beyond linking.
+- QEMU here is TCG emulation, so timing says nothing about real hardware.
 
-## 5. Proposed G4 integration (not done; needs review)
+## 5. Integration into the inference kernel (proposed; not done)
 
-The smallest change that exercises Glyph inside the kernel adds four things to
-`02-baremetal-os/kernel.asm`. No driver, scheduler, SMP or inference code changes,
+The standalone kernel above proves that the core, adapter and drivers work
+together on the real boot path. To run Glyph *alongside inference*, the smallest
+change adds four things to `02-baremetal-os/kernel.asm`. No driver, scheduler, SMP or inference code changes,
 and no core is reserved.
 
 1. `extern glyph_shell_run`.
@@ -133,15 +141,15 @@ and no core is reserved.
 4. Later (G5): take source from a Multiboot module or a serial upload, with the
    length checked against `GLYPH_MAX_SOURCE` before the call.
 
-**Conformance on bare metal.** A `/glyphtest` command would call
-`glyph_shell_transcript` for each corpus entry that was compiled in with `incbin`.
-A host script would compare the COM1 output with `tests/corpus/*.expect` (QEMU
-`-serial stdio`). The transcript code is the same object file on both targets,
-so any difference points at the platform.
+**Conformance on bare metal** is already done by the standalone kernel
+(`make qemu-test`). Inside the inference kernel, a `/glyphtest` command could reuse
+`glyph_bm_transcript` and the same payload table.
 
 **Things to check during G4:**
 - Rendering is the only cost. A full frame is about 1 920 `vga_putc_utf8` calls, and
-  `vga_clear` produces visible flicker on each redraw. A five-instruction
+  `vga_clear` produces visible flicker on each redraw. The VGA hardware cursor also
+  stays at the top-left cell during a Glyph session, because the drivers have no
+  call to move or hide it. A five-instruction
   `vga_goto(row, col)` in `drivers.asm` would let the adapter skip the clear. That
   extends the driver rather than duplicating it, but it is a kernel change, so it
   has been left for the owner to decide.

@@ -63,8 +63,8 @@ ON down IF :count > 0 [ADD count -1]
 ## Screenshots
 
 These are real `glyph run` sessions on the Linux host: an 80×25 xterm with the VGA
-16-colour palette, driven by real key presses. They are not from the bare-metal
-target, which has not been booted yet. Regenerate them with `make screenshots`
+16-colour palette, driven by real key presses. For the same programs booted as
+a kernel in QEMU, see [Booting in a VM](#booting-in-a-vm). Regenerate them with `make screenshots`
 (needs Xvfb, xterm, xdotool and ImageMagick).
 
 ![A Turing machine written in Glyph after running the 4-state busy beaver: halted after 107 steps with 13 ones](docs/screenshots/06-turing-halted.png)
@@ -82,6 +82,36 @@ target, which has not been booted yet. Regenerate them with `make screenshots`
 | UI demo at start (`examples/demo.glyph`) | After +1 ×3, typing "Ada" and three spins |
 | ![UI demo locked](docs/screenshots/03-demo-locked.png) | ![glyph check diagnostics](docs/screenshots/09-diagnostics.png) |
 | Locked: controls disabled, focus moved to Unlock | `glyph check` diagnostics for typical generated-code mistakes |
+
+## Booting in a VM
+
+`make glyph-os` builds `build/glyph-os.elf`, an 88 KB Multiboot kernel. It is
+made of this repository's **unmodified** Phase 2 `boot.asm`, `drivers.asm`,
+`runtime.asm` and `linker.ld`, plus Glyph and a small `kernel_main`
+(`src/baremetal/glyph_os.c`). It has the examples and the conformance corpus
+built in. It does not include the Qwen inference engine.
+
+```sh
+make qemu-run APP=turing                         # VGA window; ESC opens a menu, ESC again powers off
+make qemu-run QEMU_DISPLAY='-display curses'     # the same in a terminal
+make qemu-test                                   # bare-metal conformance: 55 transcripts vs the host
+make vm-screenshots                              # VGA screenshots via QEMU sendkey/screendump
+```
+
+Under QEMU 8.2 (software emulation, no KVM) it boots in under a second. All **55
+transcripts are byte-identical** to the Linux host's, on a CPU with AVX and on
+one without. Keys reach Glyph as PS/2 scancodes through the kernel's own keyboard
+driver, and the screen is the kernel's VGA text driver:
+
+![Glyph's Turing machine on the bare-metal boot path in QEMU, halted after 107 steps](docs/screenshots/vm-02-turing-halted.png)
+
+| | |
+|---|---|
+| ![UI demo in QEMU after typing a name](docs/screenshots/vm-05-demo.png) | ![Kernel menu of the built-in programs](docs/screenshots/vm-03-menu.png) |
+| UI demo in QEMU, keys sent as PS/2 scancodes | The kernel's program menu (ESC from an app) |
+
+It has not run on P510 hardware yet, nor inside the inference kernel
+(`docs/BACKEND.md` §4–5).
 
 ## Build and test (Linux)
 
@@ -101,6 +131,7 @@ make baremetal-link  # core + adapter linked against ../02-* and ../04-*/drivers
 make kernel-link     # full link of the unmodified Phase 2 and Phase 4 kernels with Glyph
 make reference       # Turing machines, Rule 110, recursion checked against Python (python3)
 make screenshots     # regenerate docs/screenshots (Xvfb, xterm, xdotool, ImageMagick)
+make qemu-test       # boot the Glyph kernel in QEMU, compare 55 transcripts with the host (qemu-system-x86)
 make check-all       # everything except fuzz
 ```
 
@@ -127,12 +158,14 @@ make check-all       # everything except fuzz
 | `include/glyph_limits.h` | Every resource limit |
 | `src/core/` | Shared core: `lex`, `parse` (compiler to bytecode), `exec` (stack VM), `turtle`, `ui`, `runner`, `script`, `util` |
 | `src/host/` | Linux CLI (`main.c`) and terminal backend (`term.c`) |
-| `src/baremetal/` | Bare-metal adapter (`glyph_bm.c`) and stack-aligning NASM shims |
+| `src/baremetal/` | Bare-metal adapter (`glyph_bm.c`), stack-aligning NASM shims, and `glyph_os.c` (`kernel_main` of the bootable Glyph kernel) |
 | `tests/unit.c` | Unit tests, one section per required category |
 | `tests/corpus/` | Shared conformance corpus: `.glyph` + `.events` → `.expect` transcript |
 | `tests/fuzz.c` | libFuzzer target (program + event script) |
 | `tests/kernel_link.sh` | Kernel link check for Phase 2 and Phase 4 |
 | `tests/reference/check_tc.py` | Independent Python checks of the Turing machine, Rule 110 and recursion results |
+| `tests/qemu_conformance.py` | Boots the Glyph kernel in QEMU and compares its COM1 transcripts with the host's |
+| `tools/` | `mkpayload.sh` (embeds programs in the kernel), `screenshots.sh`, `qemu_shots.py` |
 | `examples/` | Example programs; each has an expected transcript and is tested |
 | `docs/screenshots/` | Screenshots of real sessions (`tools/screenshots.sh`) |
 | `docs/SPEC.md` | Language specification |
@@ -159,7 +192,9 @@ make check-all       # everything except fuzz
 
 v0.2 is the Turing-complete language. It covers stages 1–3 of the mission and the
 portability part of stage 4, and has been built and tested on Linux. The
-bare-metal target has been compiled and linked into both of the fork's kernels,
-but **not booted**. See
+bare-metal side builds a bootable Glyph kernel. That kernel passes the full
+conformance corpus under QEMU, and Glyph also links into both of the fork's
+inference kernels. It has not yet run on P510 hardware or inside the inference
+kernel. See
 `docs/BACKEND.md` §4–5 and `docs/DECISIONS.md` for limitations and next
 milestones.

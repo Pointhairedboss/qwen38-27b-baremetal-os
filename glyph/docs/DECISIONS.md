@@ -152,6 +152,16 @@ snappy by default, and longer computations remain possible on request.
 evaluation of lists as code, as the mission requires. Programs are compiled once
 at load, and nothing at run time can create code.
 
+<a id="d25"></a>**D25 — A standalone bootable Glyph kernel for VM testing.** The
+inference kernel only reaches its REPL after loading a model, which is not
+available here, and running Qwen under QEMU without KVM would be very slow. So
+`build/glyph-os.elf` reuses the fork's unmodified Phase 2 `boot.asm`,
+`drivers.asm`, `runtime.asm` and `linker.ld` with a C `kernel_main`
+(`src/baremetal/glyph_os.c`), the same pattern as Phase 4's `bartest.asm`. It
+exercises the real boot path, drivers and ABI, and the bare-metal conformance run,
+without changing any kernel file. Running Glyph *inside* the inference kernel
+(BACKEND.md §5) remains G4a.
+
 ## Deviations from bootLogo semantics
 
 Reference: `nanochess/bootLogo` at `e3ce458a6d4eb0c0f41e3fc0f1239e09864b9df0`
@@ -191,8 +201,10 @@ and is clipped to 80 × 24, because text cells are much coarser than CGA pixels.
 
 ## Known limitations (v0.2)
 
-- **Not booted.** The bare-metal path is verified only by compile and link
-  (BACKEND.md §4). G4 (kernel call site, QEMU/P510 boot) has not started.
+- **Booted only in QEMU, as a standalone kernel.** The conformance corpus matches
+  the host exactly (55/55), and the VGA and PS/2 paths work under emulation
+  (BACKEND.md §4). Glyph has not run inside the Qwen inference kernel or on P510
+  hardware.
 - **The VGA adapter clears and redraws the whole screen per input**, which flickers.
   A positioned-write driver entry would fix this (BACKEND.md §5).
 - Text cells are about 2:1 tall, so turtle figures look stretched. There is no
@@ -214,12 +226,11 @@ and is clipped to 80 × 24, because text cells are much coarser than CGA pixels.
 ## Next milestones
 
 1. **Review** v0.2 (the Turing-complete language) against real model-generated programs.
-2. **G4a — kernel call site.** Add the `/glyph` REPL command (BACKEND.md §5) on
-   Phase 2, boot in QEMU (`-vga std`) and run `examples/demo.glyph` from the PS/2
-   keyboard. Check that the inference smoke test (`scripts/verify_os.py`) is
-   unchanged.
-3. **G4b — bare-metal conformance.** Add `/glyphtest` to emit transcripts over COM1
-   and compare them with `tests/corpus/*.expect` from a host script.
+2. **G4a — inside the inference kernel.** Add the `/glyph` REPL command (BACKEND.md
+   §5) to Phase 2. Test it with a real model on a KVM host. Check that the
+   inference smoke test (`scripts/verify_os.py`) is unchanged.
+3. **G4b — bare-metal conformance:** done under QEMU with the standalone kernel
+   (`make qemu-test`, 55/55). Repeat on a P510.
 4. **G4c — Phase 4.** Repeat on the 27B kernel after confirming the memory layout.
 5. **Language, driven by real model output:** LOGO lists, a seeded `RANDOM`, or
    a `PRINT` console area, each only if generated programs show the need.

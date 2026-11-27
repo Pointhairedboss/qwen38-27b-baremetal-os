@@ -37,7 +37,7 @@ FORK     := ..
 P2_DIR   := $(FORK)/02-baremetal-os
 P4_DIR   := $(FORK)/04-qwen38-27b-os
 
-.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean reference screenshots
+.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean reference screenshots glyph-os qemu-run qemu-test vm-screenshots
 
 all: $(BUILD)/glyph
 
@@ -137,3 +137,42 @@ reference: $(BUILD)/glyph
 # ---- screenshots (Xvfb, xterm, xdotool, ImageMagick) ------------------------
 screenshots: $(BUILD)/glyph
 	tools/screenshots.sh docs/screenshots
+
+# ---- bootable Glyph kernel (QEMU) ---------------------------------------------
+# A standalone Multiboot kernel: the fork's unmodified Phase 2 boot.asm,
+# drivers.asm, runtime.asm and linker.ld, plus Glyph and src/baremetal/glyph_os.c
+# (kernel_main). Embeds the examples and the conformance corpus.
+OSK          := $(BUILD)/os
+GLYPH_OS     := $(BUILD)/glyph-os.elf
+APP          ?= demo
+QEMU_SYSTEM  ?= qemu-system-x86_64 -machine pc -cpu max -m 256M -no-reboot
+QEMU_DISPLAY ?=
+
+$(GLYPH_OS): freestanding src/baremetal/glyph_os.c src/baremetal/glyph_bm.c tools/mkpayload.sh \
+             examples/*.glyph tests/corpus/*.glyph
+	mkdir -p $(OSK)
+	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_bm.c -o $(OSK)/glyph_bm.o
+	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_os.c -o $(OSK)/glyph_os.o
+	sh tools/mkpayload.sh $(OSK)/payload.asm
+	nasm -f elf64 $(OSK)/payload.asm -o $(OSK)/payload.o
+	for m in boot drivers runtime; do \
+		nasm -f elf64 -DBARE_METAL -DFAST_Q8=1 -I$(FORK)/shared/ -I$(P2_DIR)/ $(P2_DIR)/$$m.asm -o $(OSK)/$$m.o || exit 1; done
+	ld -m elf_x86_64 -T $(P2_DIR)/linker.ld --gc-sections -s -z max-page-size=0x1000 -z noexecstack \
+		$(OSK)/boot.o $(OSK)/drivers.o $(OSK)/runtime.o $(BUILD)/glyph_core.o \
+		$(OSK)/glyph_bm.o $(OSK)/glyph_os.o $(OSK)/payload.o -o $(GLYPH_OS).64
+	objcopy -O elf32-i386 $(GLYPH_OS).64 $(GLYPH_OS)
+
+glyph-os: $(GLYPH_OS)
+	ls -la $(GLYPH_OS)
+
+# Boot interactively: VGA window (or QEMU_DISPLAY='-display curses' in a terminal).
+qemu-run: $(GLYPH_OS)
+	$(QEMU_SYSTEM) $(QEMU_DISPLAY) -kernel $(GLYPH_OS) -append 'app=$(APP)'
+
+# Boot with glyph=test and compare every transcript on COM1 with the host .expect.
+qemu-test: $(GLYPH_OS)
+	python3 -I tests/qemu_conformance.py $(GLYPH_OS)
+
+# VGA screenshots through the emulated PS/2 keyboard (QEMU monitor sendkey/screendump).
+vm-screenshots: $(GLYPH_OS)
+	python3 -I tools/qemu_shots.py docs/screenshots
