@@ -113,7 +113,9 @@ static void t_status(void *user, const char *text, int len)
     (void)user;
     fbs("\x1b[7m");
     fb(text, (size_t)len);
-    fbs("\x1b[0m\x1b[K\r\n");
+    /* No newline: an 80x24 frame plus this line exactly fills an 80x25
+     * terminal, and a newline here would scroll it every frame. */
+    fbs("\x1b[0m\x1b[K");
 }
 
 static void t_end(void *user)
