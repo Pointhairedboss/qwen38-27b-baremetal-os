@@ -110,8 +110,41 @@ driver, and the screen is the kernel's VGA text driver:
 | ![UI demo in QEMU after typing a name](docs/screenshots/vm-05-demo.png) | ![Kernel menu of the built-in programs](docs/screenshots/vm-03-menu.png) |
 | UI demo in QEMU, keys sent as PS/2 scancodes | The kernel's program menu (ESC from an app) |
 
-It has not run on P510 hardware yet, nor inside the inference kernel
-(`docs/BACKEND.md` §4–5).
+### Inside the Qwen inference kernel
+
+The Phase 2 inference kernel (`make os` in the repository root) has Glyph linked
+in. At the `asm-llm>` chat prompt:
+
+- `/glyph` lists the built-in programs.
+- `/glyph NAME` runs one on screen; ESC returns to the chat.
+- `/glyphtest` runs the conformance corpus.
+
+Recorded under QEMU with the real **Qwen3-0.6B**, every key typed on the emulated
+PS/2 keyboard:
+
+![Walkthrough: boot to asm-llm>, /glyph demo, /glyph rule110, then Qwen answers "Tokyo"](docs/screenshots/inference-glyph.gif)
+
+`glyph/tests/qemu_inference_glyph.py` checks this end to end, and all 10 checks
+pass:
+
+- Both answers are token-identical to the Linux build, before and after a Glyph
+  session.
+- `/glyph` and `/glyph turing` work, and ESC returns to the chat.
+- `/glyphtest` gives 55/55 transcripts identical to the host, inside the inference
+  kernel.
+
+Without KVM, QEMU emulates the AVX2 kernels in software. Inference ran at about
+0.18 tokens/s, so each answer took about 2.5 minutes. With `-enable-kvm` it runs
+at native speed.
+
+```sh
+make os inference                                # repository root
+python3 -I glyph/tests/qemu_inference_glyph.py models/qwen3-0.6b-q8_0.asmbin
+python3 -I glyph/tools/qemu_showcase.py models/qwen3-0.6b-q8_0.asmbin   # records the GIF
+```
+
+Not yet done: a run on P510 hardware, the fork's full `scripts/verify_os.py`
+parity suite (it needs KVM), and the Phase 4 kernel (`docs/BACKEND.md` §4–5).
 
 ## Build and test (Linux)
 
@@ -194,7 +227,8 @@ v0.2 is the Turing-complete language. It covers stages 1–3 of the mission and 
 portability part of stage 4, and has been built and tested on Linux. The
 bare-metal side builds a bootable Glyph kernel. That kernel passes the full
 conformance corpus under QEMU, and Glyph also links into both of the fork's
-inference kernels. It has not yet run on P510 hardware or inside the inference
-kernel. See
+inference kernels. In the Phase 2 inference kernel, `/glyph` runs Glyph alongside
+a real Qwen3-0.6B. Under QEMU, inference stays token-identical before and after
+Glyph runs. It has not yet run on P510 hardware. See
 `docs/BACKEND.md` §4–5 and `docs/DECISIONS.md` for limitations and next
 milestones.

@@ -124,7 +124,7 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
 - Phase 4 has not been exercised beyond linking.
 - QEMU here is TCG emulation, so timing says nothing about real hardware.
 
-## 5. Integration into the inference kernel (implemented for Phase 2; end-to-end run pending)
+## 5. Integration into the inference kernel (Phase 2: implemented and tested under QEMU)
 
 **Status.** Implemented with the owner's go-ahead, and it builds and links: the
 root `make os` produces `build/asm-llm-os.elf` at 103 448 B, against 24 252 B for
@@ -134,10 +134,26 @@ the pinned upstream kernel (`tests/kernel_link.sh`). At the `asm-llm>` prompt:
 - `/glyph NAME` runs one on VGA; ESC returns to the chat.
 - `/glyphtest` prints the conformance transcripts on COM1.
 
-`glyph/tests/qemu_inference_glyph.py` boots the kernel with a real Qwen3-0.6B
-model under QEMU and checks that answers are token-identical to the Linux build
-before and after a Glyph session. **That run has not completed yet; no result is
-claimed here.** Phase 4 is not integrated.
+**End-to-end result (2026-11-27, QEMU 8.2 TCG, 4 vCPUs, `-cpu max`, real Qwen3-0.6B
+Q8_0 exported with the fork's `scripts/export_weights.py`).**
+`glyph/tests/qemu_inference_glyph.py` passed all 10 checks:
+
+| Check | Result |
+|---|---|
+| Batch prompt "What is the capital of France? Answer in one word.": prompt and answer token IDs vs `build/asm-llm` on Linux | identical: answer `59604` ("Paris") |
+| `/glyph` lists the programs; `/glyph turing` on VGA with PS/2 keys; ESC returns to `asm-llm>` | pass. Halted at 107 steps with 13 ones (`docs/screenshots/vm-11-inference-glyph-turing.png`). |
+| `/glyphtest` inside the inference kernel vs the host `.expect` files | 55/55 identical |
+| After `/clear`, the REPL prompt "What is 2+2? Answer with just the number.": tokens vs Linux | identical: answer `17` ("2", the 0.6B model's greedy answer on both) |
+
+Under TCG, prefill ran at about 0.18 tokens/s (about 2.5 min per answer). That is
+emulation speed, not a property of the kernel. `glyph/tools/qemu_showcase.py`
+recorded `docs/screenshots/inference-glyph.gif`: `/glyph demo`, `/glyph rule110`,
+then "Tokyo".
+
+**Not yet done:**
+- The fork's own five-prompt parity suite (`scripts/verify_os.py`), which needs KVM.
+- P510 hardware.
+- Phase 4, which is not integrated.
 
 The change, as implemented: the `kernel.asm` REPL hands every trimmed line to
 `glyph_shell_repl` (`src/baremetal/glyph_repl.c`) before its own `/commands`.
@@ -156,9 +172,9 @@ and no core is reserved.
 4. Later (G5): take source from a Multiboot module or a serial upload, with the
    length checked against `GLYPH_MAX_SOURCE` before the call.
 
-**Conformance on bare metal** is already done by the standalone kernel
-(`make qemu-test`). Inside the inference kernel, a `/glyphtest` command could reuse
-`glyph_bm_transcript` and the same payload table.
+**Conformance on bare metal** is done in both kernels: the standalone kernel
+(`make qemu-test`) and the inference kernel (`/glyphtest`) each give 55/55
+identical transcripts.
 
 **Things to check during G4:**
 - Rendering is the only cost. A full frame is about 1 920 `vga_putc_utf8` calls, and

@@ -159,8 +159,15 @@ available here, and running Qwen under QEMU without KVM would be very slow. So
 `drivers.asm`, `runtime.asm` and `linker.ld` with a C `kernel_main`
 (`src/baremetal/glyph_os.c`), the same pattern as Phase 4's `bartest.asm`. It
 exercises the real boot path, drivers and ABI, and the bare-metal conformance run,
-without changing any kernel file. Running Glyph *inside* the inference kernel
-(BACKEND.md §5) remains G4a.
+without changing any kernel file. Glyph inside the inference kernel came next
+(G4a, BACKEND.md §5).
+
+<a id="d26"></a>**D26 — The inference kernel hands REPL lines to Glyph first.**
+`kernel.asm` calls `glyph_shell_repl` with each trimmed line before its own
+`/commands`, and only `/glyph…` lines are claimed. This keeps the kernel change to
+10 lines and puts all parsing in C. Glyph runs synchronously on the BSP between
+inference turns and never touches the model, KV cache, arena or AP cores; its
+state is in `.bss`. The owner approved the kernel change on 2026-11-27.
 
 ## Deviations from bootLogo semantics
 
@@ -201,10 +208,11 @@ and is clipped to 80 × 24, because text cells are much coarser than CGA pixels.
 
 ## Known limitations (v0.2)
 
-- **Booted only in QEMU, as a standalone kernel.** The conformance corpus matches
-  the host exactly (55/55), and the VGA and PS/2 paths work under emulation
-  (BACKEND.md §4). Glyph has not run inside the Qwen inference kernel or on P510
-  hardware.
+- **Run only under QEMU (TCG), not on hardware.** The standalone kernel and the
+  Phase 2 inference kernel both pass the conformance corpus (55/55). In the
+  inference kernel, real Qwen3-0.6B answers stay token-identical to Linux before
+  and after a Glyph session (BACKEND.md §5). Not yet done: the fork's
+  `verify_os.py` suite (needs KVM), P510 hardware, and Phase 4.
 - **The VGA adapter clears and redraws the whole screen per input**, which flickers.
   A positioned-write driver entry would fix this (BACKEND.md §5).
 - Text cells are about 2:1 tall, so turtle figures look stretched. There is no
@@ -226,9 +234,8 @@ and is clipped to 80 × 24, because text cells are much coarser than CGA pixels.
 ## Next milestones
 
 1. **Review** v0.2 (the Turing-complete language) against real model-generated programs.
-2. **G4a — inside the inference kernel.** Add the `/glyph` REPL command (BACKEND.md
-   §5) to Phase 2. Test it with a real model on a KVM host. Check that the
-   inference smoke test (`scripts/verify_os.py`) is unchanged.
+2. **G4a — inside the inference kernel:** done for Phase 2 under QEMU (BACKEND.md
+   §5). Still to do: run the fork's `scripts/verify_os.py` on a KVM host.
 3. **G4b — bare-metal conformance:** done under QEMU with the standalone kernel
    (`make qemu-test`, 55/55). Repeat on a P510.
 4. **G4c — Phase 4.** Repeat on the 27B kernel after confirming the memory layout.
