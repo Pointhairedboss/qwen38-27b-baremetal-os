@@ -60,6 +60,29 @@ ON down IF :count > 0 [ADD count -1]
 +--------------------------------+
 ```
 
+## Screenshots
+
+These are real `glyph run` sessions on the Linux host: an 80×25 xterm with the VGA
+16-colour palette, driven by real key presses. They are not from the bare-metal
+target, which has not been booted yet. Regenerate them with `make screenshots`
+(needs Xvfb, xterm, xdotool and ImageMagick).
+
+![A Turing machine written in Glyph after running the 4-state busy beaver: halted after 107 steps with 13 ones](docs/screenshots/06-turing-halted.png)
+
+*`examples/turing.glyph`: a Turing machine written in Glyph, halted after the
+4-state busy beaver's 107 steps with 13 ones on the tape.*
+
+| | |
+|---|---|
+| ![Turing machine with BB-4 loaded](docs/screenshots/04-turing-start.png) | ![Turing machine after 12 steps](docs/screenshots/05-turing-stepping.png) |
+| Turing machine: BB-4 loaded | …after 12 presses of Step |
+| ![Rule 110 cellular automaton, 24 generations](docs/screenshots/07-rule110.png) | ![Recursive turtle tree with fib 20 and 12 factorial](docs/screenshots/08-tree.png) |
+| Rule 110, 24 generations (`examples/rule110.glyph`) | Recursive tree, `fib 20` and `12!` (`examples/tree.glyph`) |
+| ![UI demo at start](docs/screenshots/01-demo-start.png) | ![UI demo after interaction](docs/screenshots/02-demo-interacting.png) |
+| UI demo at start (`examples/demo.glyph`) | After +1 ×3, typing "Ada" and three spins |
+| ![UI demo locked](docs/screenshots/03-demo-locked.png) | ![glyph check diagnostics](docs/screenshots/09-diagnostics.png) |
+| Locked: controls disabled, focus moved to Unlock | `glyph check` diagnostics for typical generated-code mistakes |
+
 ## Build and test (Linux)
 
 You need a C99 compiler, GNU make and binutils. clang with compiler-rt
@@ -77,6 +100,7 @@ make freestanding    # core compiled with kernel flags; proves zero external sym
 make baremetal-link  # core + adapter linked against ../02-* and ../04-*/drivers.asm
 make kernel-link     # full link of the unmodified Phase 2 and Phase 4 kernels with Glyph
 make reference       # Turing machines, Rule 110, recursion checked against Python (python3)
+make screenshots     # regenerate docs/screenshots (Xvfb, xterm, xdotool, ImageMagick)
 make check-all       # everything except fuzz
 ```
 
@@ -110,6 +134,7 @@ make check-all       # everything except fuzz
 | `tests/kernel_link.sh` | Kernel link check for Phase 2 and Phase 4 |
 | `tests/reference/check_tc.py` | Independent Python checks of the Turing machine, Rule 110 and recursion results |
 | `examples/` | Example programs; each has an expected transcript and is tested |
+| `docs/screenshots/` | Screenshots of real sessions (`tools/screenshots.sh`) |
 | `docs/SPEC.md` | Language specification |
 | `docs/ARCHITECTURE.md` | Modules, memory, determinism, untrusted input, embedding API |
 | `docs/BACKEND.md` | Backend interface, fork driver ABI, bare-metal integration notes |

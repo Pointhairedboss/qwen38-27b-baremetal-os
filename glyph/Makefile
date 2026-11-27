@@ -37,7 +37,7 @@ FORK     := ..
 P2_DIR   := $(FORK)/02-baremetal-os
 P4_DIR   := $(FORK)/04-qwen38-27b-os
 
-.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean reference
+.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean reference screenshots
 
 all: $(BUILD)/glyph
 
@@ -133,3 +133,7 @@ clean:
 # Busy beavers, Rule 110, recursion and the sieve checked against Python.
 reference: $(BUILD)/glyph
 	python3 -I tests/reference/check_tc.py $(BUILD)/glyph
+
+# ---- screenshots (Xvfb, xterm, xdotool, ImageMagick) ------------------------
+screenshots: $(BUILD)/glyph
+	tools/screenshots.sh docs/screenshots
