@@ -1,0 +1,20 @@
+# Load each busy beaver, run it to the halt state, show the result.
+frame
+action load2
+action dorun
+state
+action load3
+key TAB
+key TAB
+key TAB
+key TAB
+key ENTER
+frame
+click b4
+click bs
+click bs
+click bs
+frame
+click br
+frame
+state

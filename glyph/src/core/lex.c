@@ -1,13 +1,19 @@
 /* lex.c — incremental tokeniser. The parser pulls one token at a time; the
  * lexer never looks further ahead than the current token and never reads
- * outside [src, src+len). */
+ * outside [src, src+len).
+ *
+ * Minus follows UCBLogo's spacing rule: a '-' that follows whitespace, '('
+ * or '[' (or starts the text) and is immediately followed by a non-space
+ * character starts a new input ("SETXY 10 -5" is two inputs); a '-'
+ * immediately followed by a digit in that position is a negative literal.
+ * Any other '-' is binary subtraction (":a - 5", ":a-5"). */
 #include "glyph_internal.h"
 
 void lex_begin(glyph_lexer *lx, const char *src, uint32_t len)
 {
     lx->src = src; lx->len = len; lx->pos = 0;
     lx->line = 1; lx->col = 1; lx->ntokens = 0;
-    lx->type = TOK_EOF; lx->tline = 1; lx->tcol = 1;
+    lx->type = TOK_EOF; lx->op = 0; lx->unary = 0; lx->tline = 1; lx->tcol = 1;
     lx->ival = 0; lx->tlen = 0; lx->text[0] = 0;
 }
 
@@ -28,6 +34,16 @@ static void advance(glyph_lexer *lx)
 static int is_alpha(int c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
 static int is_digit(int c) { return c >= '0' && c <= '9'; }
 static int is_word(int c)  { return is_alpha(c) || is_digit(c) || c == '_'; }
+static int is_space(int c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; }
+
+/* True if the current character is in a position where '-' starts an input. */
+static int starts_input(const glyph_lexer *lx)
+{
+    int prev;
+    if (lx->pos == 0) return 1;
+    prev = (unsigned char)lx->src[lx->pos - 1];
+    return is_space(prev) || prev == '(' || prev == '[';
+}
 
 static int bad_char(glyph_lexer *lx, glyph_diag *d, int c)
 {
@@ -77,7 +93,7 @@ int lex_next(glyph_lexer *lx, glyph_diag *d)
         break;
     }
     lx->tline = lx->line; lx->tcol = lx->col;
-    lx->tlen = 0; lx->text[0] = 0; lx->ival = 0;
+    lx->tlen = 0; lx->text[0] = 0; lx->ival = 0; lx->op = 0; lx->unary = 0;
     if (c == -1) { lx->type = TOK_EOF; return GLYPH_OK; }
 
     if (++lx->ntokens > GLYPH_MAX_TOKENS) {
@@ -87,6 +103,35 @@ int lex_next(glyph_lexer *lx, glyph_diag *d)
 
     if (c == '[') { advance(lx); lx->type = TOK_LBRACK; return GLYPH_OK; }
     if (c == ']') { advance(lx); lx->type = TOK_RBRACK; return GLYPH_OK; }
+    if (c == '(') { advance(lx); lx->type = TOK_LPAREN; return GLYPH_OK; }
+    if (c == ')') { advance(lx); lx->type = TOK_RPAREN; return GLYPH_OK; }
+    if (c == '+' || c == '*' || c == '/' || c == '=' || c == '<' || c == '>' ||
+        (c == '-' && !(starts_input(lx) && lx->pos + 1 < lx->len && is_digit((unsigned char)lx->src[lx->pos + 1])))) {
+        lx->type = TOK_OP;
+        if (c == '-') {
+            lx->op = TOP_MINUS;
+            lx->unary = (uint8_t)(starts_input(lx) && lx->pos + 1 < lx->len &&
+                                  !is_space((unsigned char)lx->src[lx->pos + 1]));
+            advance(lx);
+            return GLYPH_OK;
+        }
+        advance(lx);
+        switch (c) {
+        case '+': lx->op = TOP_PLUS; break;
+        case '*': lx->op = TOP_MUL; break;
+        case '/': lx->op = TOP_DIV; break;
+        case '=': lx->op = TOP_EQ; break;
+        case '<':
+            if (peekc(lx) == '=') { advance(lx); lx->op = TOP_LE; }
+            else if (peekc(lx) == '>') { advance(lx); lx->op = TOP_NE; }
+            else lx->op = TOP_LT;
+            break;
+        default:
+            if (peekc(lx) == '=') { advance(lx); lx->op = TOP_GE; }
+            else lx->op = TOP_GT;
+        }
+        return GLYPH_OK;
+    }
 
     if (is_alpha(c)) { lx->type = TOK_WORD; return read_word(lx, d); }
 
@@ -100,7 +145,7 @@ int lex_next(glyph_lexer *lx, glyph_diag *d)
         return read_word(lx, d);
     }
 
-    if (is_digit(c) || (c == '-' && lx->pos + 1 < lx->len && is_digit((unsigned char)lx->src[lx->pos + 1]))) {
+    if (is_digit(c) || c == '-') {     /* '-' here is always a negative literal */
         int neg = 0;
         int32_t v = 0;
         if (c == '-') { neg = 1; advance(lx); }

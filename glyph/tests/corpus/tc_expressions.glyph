@@ -1,0 +1,27 @@
+; Expressions: precedence, integer division, REMAINDER, the UCBLogo minus
+; spacing rule, comparisons on numbers and strings, logic, WORD, saturation.
+SCREEN 10 2
+SET p1 2 + 3 * 4          ; 14
+SET p2 (2 + 3) * 4        ; 20
+SET p3 20 / 3             ; 6 (truncates toward zero)
+SET p4 -20 / 3            ; -6
+SET p5 REMAINDER 20 3     ; 2
+SET p6 REMAINDER -20 3    ; -2 (sign of the dividend)
+SET p7 10 - 4 - 3         ; 3 (left associative)
+SET p8 2 * -3             ; -6
+SET p9 - (4 + 1)          ; -5
+SET m1 10-4               ; 6: no spaces, subtraction
+SET m2 10 - 4             ; 6
+SET c1 3 < 4              ; 1
+SET c2 3 >= 4             ; 0
+SET c3 "abc" = "abc"      ; 1
+SET c4 "abc" <> "abd"     ; 1
+SET c5 5 = "5"            ; 0: a number never equals a string
+SET l1 AND 1 0            ; 0
+SET l2 OR 0 7             ; 1
+SET l3 NOT 0              ; 1
+SET t TRUE + TRUE         ; 2
+SET w1 WORD "x=" 42       ; "x=42"
+SET w2 WORD WORD "a" "b" "c"
+SET s1 999999999 + 1      ; saturates at 999999999
+SET s2 -999999999 * 2     ; saturates at -999999999

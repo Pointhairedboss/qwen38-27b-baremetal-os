@@ -63,11 +63,27 @@ static int cmd_check(int argc, char **argv)
     for (i = 0; i < argc; i++) {
         int e = load_or_report(argv[i], &len);
         if (e) { bad = 1; continue; }
-        printf("%s: ok (%d statements, %d components, %d state, %d procedures, %d handlers, screen %dx%d)\n",
-               argv[i], g_vm.n_nodes - 1, g_vm.n_comps, g_vm.n_state, g_vm.n_procs, g_vm.n_handlers,
-               g_vm.w, g_vm.h);
+        printf("%s: ok (%d instructions, %d procedures, %d handlers, %d components, %d globals, %d arrays, screen %dx%d)\n",
+               argv[i], g_vm.n_code - 1, g_vm.n_procs, g_vm.n_handlers, g_vm.n_comps, g_vm.n_state,
+               g_vm.n_arrays, g_vm.w, g_vm.h);
     }
     return bad;
+}
+
+/* Strip a leading "--budget N" option. Returns -1 on a bad value. */
+static int take_budget(int *argc, char ***argv)
+{
+    char *end;
+    unsigned long n;
+    if (*argc < 2 || strcmp((*argv)[0], "--budget") != 0) return 0;
+    n = strtoul((*argv)[1], &end, 10);
+    if (*end || n == 0 || n > GLYPH_MAX_STEPS) {
+        fprintf(stderr, "--budget must be 1..%d\n", GLYPH_MAX_STEPS);
+        return -1;
+    }
+    glyph_set_budget(&g_vm, (uint32_t)n);
+    *argc -= 2; *argv += 2;
+    return 0;
 }
 
 static int cmd_run(int argc, char **argv)
@@ -75,7 +91,8 @@ static int cmd_run(int argc, char **argv)
     glyph_backend be;
     long len;
     int e;
-    if (argc != 1) { fprintf(stderr, "usage: glyph run FILE\n"); return 2; }
+    if (take_budget(&argc, &argv)) return 2;
+    if (argc != 1) { fprintf(stderr, "usage: glyph run [--budget N] FILE\n"); return 2; }
     if (load_or_report(argv[0], &len)) return 1;
     if (term_open() != 0) {
         fprintf(stderr, "glyph run needs a terminal; use `glyph replay FILE` for headless output\n");
@@ -107,7 +124,8 @@ static int cmd_replay(int argc, char **argv)
     long len, slen;
     const char *script = default_script;
     int e;
-    if (argc < 1 || argc > 2) { fprintf(stderr, "usage: glyph replay FILE [EVENTS|-]\n"); return 2; }
+    if (take_budget(&argc, &argv)) return 2;
+    if (argc < 1 || argc > 2) { fprintf(stderr, "usage: glyph replay [--budget N] FILE [EVENTS|-]\n"); return 2; }
     len = read_file(argv[0], g_src, sizeof g_src);
     if (len < 0) { fprintf(stderr, "%s: cannot read: %s\n", argv[0], strerror(errno)); return 1; }
     slen = (long)strlen(default_script);
@@ -189,53 +207,57 @@ static int cmd_test(int argc, char **argv)
     return (fail || n == 0) ? 1 : 0;
 }
 
-/* ---- IR dump --------------------------------------------------------------- */
-static void dump_operand(const glyph_node *n, int i)
+/* ---- bytecode dump --------------------------------------------------------- */
+static const char *unit_label(int u)
 {
-    switch (KIND(n, i)) {
-    case K_INT: printf(" %d", n->a[i]); break;
-    case K_STR: printf(" \"%s\"", &g_vm.strpool[STR_OFF(n->a[i])]); break;
-    case K_VAR: printf(" :%s", g_vm.syms[n->a[i]].name); break;
-    default: break;
-    }
+    static char buf[48];
+    const glyph_unit *un = &g_vm.units[u];
+    if (un->sym == 0xFFFF) return "main";
+    snprintf(buf, sizeof buf, "%s %s", (g_vm.syms[un->sym].flags & GLYPH_SYM_PROC) &&
+             g_vm.syms[un->sym].proc_unit == u ? "TO" : "ON", g_vm.syms[un->sym].name);
+    return buf;
 }
 
-static void dump_seq(uint16_t head, int indent)
+static void dump_insn(int pc)
 {
-    uint16_t i;
-    for (i = head; i; i = g_vm.nodes[i].next) {
-        const glyph_node *n = &g_vm.nodes[i];
-        int k;
-        printf("%4u  %3u:%-3u %*s%s", i, n->line, n->col, indent * 2, "", glyph_op_name(n->op));
-        switch (n->op) {
-        case OP_CALL: printf(" %s\n", g_vm.syms[n->body].name); continue;
-        case OP_SET: case OP_ADD: case OP_ENABLE: case OP_DISABLE:
-            printf(" %s", g_vm.syms[n->a[0]].name);
-            dump_operand(n, 1);
-            break;
-        default:
-            for (k = 0; k < 4; k++) dump_operand(n, k);
-        }
-        printf("\n");
-        if (n->op == OP_REPEAT || n->op == OP_BLOCK) dump_seq(n->body, indent + 1);
+    const glyph_insn *in = &g_vm.code[pc];
+    printf("%5d  %4u:%-3u %-12s", pc, in->line, in->col, glyph_op_name(in->op));
+    switch (in->op) {
+    case OP_PUSH_INT: printf(" %d", in->arg); break;
+    case OP_PUSH_STR: printf(" \"%s\"", &g_vm.strpool[STR_OFF(in->arg)]); break;
+    case OP_LOAD_G: case OP_STORE_G: case OP_ADDV_G:
+        printf(" %s (global %d)", g_vm.syms[g_vm.state[in->arg].sym].name, in->arg); break;
+    case OP_LOAD_L: case OP_STORE_L: case OP_ADDV_L:
+        printf(" %s (local %d)", g_vm.syms[in->arg >> 8].name, in->arg & 0xFF); break;
+    case OP_ITEM: case OP_SETITEM:
+        printf(" %s", g_vm.syms[g_vm.arrays[in->arg].sym].name); break;
+    case OP_CALL: case OP_CALLV: case OP_ENABLE: case OP_DISABLE:
+        printf(" %s", g_vm.syms[in->arg].name); break;
+    case OP_JMP: case OP_IF_JZ: case OP_WHILE_JZ: printf(" -> %d", in->arg); break;
+    case OP_REP_INIT: printf(" counter %d", in->arg); break;
+    case OP_REP_NEXT: printf(" counter %d, exit -> %d", in->arg >> 16, in->arg & 0xFFFF); break;
+    default: break;
     }
+    printf("\n");
 }
 
 static int cmd_dump(int argc, char **argv)
 {
     long len;
-    int i;
+    int i, u;
     static const char *kinds[] = { "?", "PANEL", "LABEL", "BUTTON", "FIELD" };
     if (argc != 1) { fprintf(stderr, "usage: glyph dump FILE\n"); return 2; }
     if (load_or_report(argv[0], &len)) return 1;
-    printf("screen %dx%d, %d nodes, %d names, %u pool bytes, vm %zu bytes\n", g_vm.w, g_vm.h,
-           g_vm.n_nodes - 1, g_vm.n_syms, g_vm.strpool_len, glyph_vm_size());
-    printf("main:\n");
-    dump_seq(g_vm.main_head, 1);
-    for (i = 0; i < g_vm.n_syms; i++) {
-        const glyph_sym *s = &g_vm.syms[i];
-        if (s->flags & GLYPH_SYM_PROC) { printf("TO %s:\n", s->name); dump_seq(s->proc_body, 1); }
-        if (s->flags & GLYPH_SYM_HANDLER) { printf("ON %s:\n", s->name); dump_seq(s->handler_body, 1); }
+    printf("screen %dx%d, %d instructions, %d names, %u pool bytes, vm %zu bytes\n", g_vm.w, g_vm.h,
+           g_vm.n_code - 1, g_vm.n_syms, g_vm.strpool_len, glyph_vm_size());
+    for (u = 0; u < g_vm.n_units; u++)
+        printf("unit %d %-20s entry %4d  inputs %d  locals %d\n", u, unit_label(u), g_vm.units[u].entry,
+               g_vm.units[u].nparams, g_vm.units[u].nlocals);
+    printf("code:\n");
+    for (i = 1; i < g_vm.n_code; i++) {
+        for (u = 0; u < g_vm.n_units; u++)
+            if (g_vm.units[u].entry == i && u > 0) printf("  ; %s\n", unit_label(u));
+        dump_insn(i);
     }
     for (i = 0; i < g_vm.n_comps; i++) {
         const glyph_comp *c = &g_vm.comps[i];
@@ -246,7 +268,9 @@ static int cmd_dump(int argc, char **argv)
         printf("\n");
     }
     for (i = 0; i < g_vm.n_state; i++)
-        printf("state %d %s\n", i, g_vm.syms[g_vm.state[i].sym].name);
+        printf("global %d %s\n", i, g_vm.syms[g_vm.state[i].sym].name);
+    for (i = 0; i < g_vm.n_arrays; i++)
+        printf("array %d %s[%d]\n", i, g_vm.syms[g_vm.arrays[i].sym].name, g_vm.arrays[i].size);
     return 0;
 }
 
@@ -256,7 +280,8 @@ static int cmd_limits(void)
     printf("source bytes      %d\n", GLYPH_MAX_SOURCE);
     printf("tokens            %d\n", GLYPH_MAX_TOKENS);
     printf("nesting depth     %d\n", GLYPH_MAX_NEST);
-    printf("IR nodes          %d\n", GLYPH_MAX_NODES - 1);
+    printf("instructions      %d\n", GLYPH_MAX_CODE - 1);
+    printf("expression depth  %d\n", GLYPH_MAX_EXPR_DEPTH);
     printf("names             %d (length %d)\n", GLYPH_MAX_NAMES, GLYPH_MAX_NAME_LEN);
     printf("string length     %d (pool %d bytes)\n", GLYPH_MAX_STR_LEN, GLYPH_MAX_STRPOOL);
     printf("procedures        %d\n", GLYPH_MAX_PROCS);
@@ -264,9 +289,11 @@ static int cmd_limits(void)
     printf("components        %d\n", GLYPH_MAX_COMPONENTS);
     printf("state variables   %d\n", GLYPH_MAX_STATE);
     printf("call depth        %d\n", GLYPH_MAX_CALL_DEPTH);
-    printf("frames            %d\n", GLYPH_MAX_FRAMES);
+    printf("local slots       %d (%d per procedure)\n", GLYPH_MAX_LOCALS, GLYPH_MAX_UNIT_LOCALS);
+    printf("value stack       %d\n", GLYPH_MAX_VSTACK);
+    printf("arrays            %d (%d cells)\n", GLYPH_MAX_ARRAYS, GLYPH_MAX_ARRAY_CELLS);
     printf("repeat count      %d\n", GLYPH_MAX_REPEAT);
-    printf("steps per entry   %d\n", GLYPH_MAX_STEPS);
+    printf("steps per entry   %d default, %d maximum\n", GLYPH_DEFAULT_STEPS, GLYPH_MAX_STEPS);
     printf("screen            %dx%d\n", GLYPH_MAX_W, GLYPH_MAX_H);
     printf("sizeof(glyph_vm)  %zu bytes\n", glyph_vm_size());
     return 0;
@@ -277,11 +304,11 @@ static void usage(void)
     fprintf(stderr,
             "glyph %s\n"
             "usage:\n"
-            "  glyph run FILE                interactive session (TAB, ENTER, SPACE, ESC to exit)\n"
+            "  glyph run [--budget N] FILE   interactive session (TAB, ENTER, SPACE, ESC to exit)\n"
             "  glyph check FILE...           load and validate\n"
-            "  glyph replay FILE [EVENTS|-]  run an event script and print the transcript\n"
+            "  glyph replay [--budget N] FILE [EVENTS|-]  run an event script, print the transcript\n"
             "  glyph test [--update] [DIR]   run the conformance corpus (default tests/corpus)\n"
-            "  glyph dump FILE               print the compiled program\n"
+            "  glyph dump FILE               print the compiled bytecode\n"
             "  glyph limits                  print compiled-in limits\n",
             GLYPH_VERSION);
 }

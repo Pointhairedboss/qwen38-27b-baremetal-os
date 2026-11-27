@@ -1,0 +1,3 @@
+; Malformed: an input listed twice.
+TO f :a :a
+END

@@ -1,0 +1,2 @@
+; Malformed: expression nesting deeper than 16.
+SET x (((((((((((((((((1)))))))))))))))))

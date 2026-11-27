@@ -5,10 +5,11 @@
 ; TAB moves focus, ENTER or SPACE presses a button, typing edits the name
 ; field, ENTER in the field submits it, ESC quits.
 ;
-; It exercises every v0.1 feature: layout (PANEL/LABEL/BUTTON/FIELD), state
-; (SET/ADD, labels bound to variables), events (ON handlers fired by controls),
-; ENABLE/DISABLE, and LOGO procedures redrawing turtle art in response to
-; input.
+; It exercises layout (PANEL/LABEL/BUTTON/FIELD), state (SET/ADD, labels
+; bound to variables), events (ON handlers fired by controls), ENABLE/DISABLE,
+; conditionals (the counter never goes below zero), and LOGO procedures with
+; inputs redrawing turtle art in response to input. See turing.glyph for a
+; full Turing machine.
 
 SCREEN 64 20
 
@@ -20,7 +21,7 @@ SET shown "stranger"
 SET mode "unlocked"
 
 ; ---- layout ------------------------------------------------------------------
-PANEL frame 0 0 64 20 "Glyph v0.1 demo"
+PANEL frame 0 0 64 20 "Glyph demo"
 
 PANEL ctr 2 2 28 6 "Counter"
 LABEL ctrlbl 4 3 "Value:"
@@ -45,19 +46,19 @@ LABEL modelbl 24 16 :mode
 LABEL help 2 18 "TAB focus  ENTER/SPACE press  type in the field  ESC quit"
 
 ; ---- turtle art ------------------------------------------------------------------
-TO petal REPEAT 3 [FD 4 RT 120] END
-TO emblem REPEAT 6 [petal RT 60] END
-; Home is (32,10). Move to the centre of the art panel, then draw at :angle.
+TO petal :size REPEAT 3 [FD :size RT 120] END
+TO emblem :size REPEAT 6 [petal :size RT 60] END
+; Clear the canvas, move to the centre of the art panel, draw at :angle.
 TO redraw
   CLEARSCREEN
-  PU RT 90 FD 15 LT 90 FD 2 PD
+  PU SETXY 47 8 PD
   RT :angle
-  COLOR 11 0 emblem COLOR 7 0
+  COLOR 11 0 emblem 4 COLOR 7 0
 END
 
 ; ---- handlers ------------------------------------------------------------------
 ON up ADD count 1
-ON down ADD count -1
+ON down IF :count > 0 [ADD count -1]
 ON zero SET count 0
 ON greet SET shown :name
 ON turn [ADD angle 15 ADD spins 1 redraw]

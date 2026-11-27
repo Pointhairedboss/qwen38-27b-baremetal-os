@@ -1,4 +1,4 @@
 SCREEN 10 2
-SET word "abc"
-ON bad FD :word
-ON worse ADD word 1
+SET msg "abc"
+ON bad FD :msg
+ON worse ADD msg 1

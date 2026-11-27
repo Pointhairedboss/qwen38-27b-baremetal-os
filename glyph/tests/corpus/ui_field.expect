@@ -1,5 +1,5 @@
-glyph 0.1
-load: ok nodes=2 names=5 components=3 state=2 procs=0 handlers=1
+glyph 0.2
+load: ok code=7 names=5 components=3 state=2 arrays=0 procs=0 handlers=1
 main: ok steps=1 changed=MSG focus=NAME
 @ type "Ada Lovelace" -> ok changed=NAME focus=NAME
 @ frame

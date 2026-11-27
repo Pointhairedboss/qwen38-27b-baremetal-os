@@ -1,0 +1,2 @@
+; Malformed: LOCAL outside a procedure.
+LOCAL x

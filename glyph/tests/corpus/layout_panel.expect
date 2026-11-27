@@ -1,5 +1,5 @@
-glyph 0.1
-load: ok nodes=3 names=10 components=8 state=2 procs=0 handlers=1
+glyph 0.2
+load: ok code=7 names=10 components=8 state=2 arrays=0 procs=0 handlers=1
 main: ok steps=2 changed=WHO focus=ENTRY
 @ frame
  0|+ Layout demo -----------------+

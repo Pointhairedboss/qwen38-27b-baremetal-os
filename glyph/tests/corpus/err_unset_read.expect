@@ -1,7 +1,7 @@
-glyph 0.1
-load: ok nodes=2 names=1 components=0 state=1 procs=0 handlers=0
-main: error steps=1 focus=-
-  ! E_UNSET 3:1 variable LATE read before SET
+glyph 0.2
+load: ok code=7 names=1 components=0 state=1 arrays=0 procs=0 handlers=0
+main: error steps=0 focus=-
+  ! E_UNSET 3:10 variable LATE read before SET
 @ frame
  0|
  1|

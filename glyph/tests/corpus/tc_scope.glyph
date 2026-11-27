@@ -1,0 +1,24 @@
+; Lexical scope: inputs and LOCALs are private to each call; every other
+; name is global. REPEAT counters are per call, so recursion inside a
+; REPEAT works.
+SCREEN 10 2
+SET x 100
+SET y 5
+SET total 0
+TO shadow :x
+  SET x :x + 1        ; the input x, not the global
+  SET y :x            ; global y
+  OUTPUT :x
+END
+TO private
+  LOCAL y
+  SET y 42            ; local y
+  OUTPUT :y
+END
+TO count :n
+  IF :n = 0 [STOP]
+  REPEAT 2 [ADD total 1 count :n - 1]
+END
+SET r1 shadow 1       ; 2; global x stays 100, global y becomes 2
+SET r2 private        ; 42; global y stays 2
+count 4               ; total = 2 + 4 + 8 + 16 = 30

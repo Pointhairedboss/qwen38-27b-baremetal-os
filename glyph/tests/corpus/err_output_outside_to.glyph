@@ -1,0 +1,2 @@
+; Malformed: OUTPUT outside a procedure.
+ON a OUTPUT 1

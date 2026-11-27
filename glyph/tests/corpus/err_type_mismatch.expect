@@ -1,10 +1,10 @@
-glyph 0.1
-load: ok nodes=3 names=3 components=0 state=1 procs=0 handlers=2
-main: ok steps=1 changed=WORD focus=-
+glyph 0.2
+load: ok code=11 names=3 components=0 state=1 arrays=0 procs=0 handlers=2
+main: ok steps=1 changed=MSG focus=-
 @ action bad -> error action=BAD steps=1 focus=-
-  ! E_TYPE 3:8 FD expects a number but got a string from :WORD
+  ! E_TYPE 3:8 FD expects a number but got the string "abc"
 @ action worse -> error action=WORSE steps=1 focus=-
-  ! E_TYPE 4:10 ADD to WORD which holds a string
+  ! E_TYPE 4:10 ADD to MSG which holds a string
 @ state
-  WORD = "abc"
+  MSG = "abc"
 end

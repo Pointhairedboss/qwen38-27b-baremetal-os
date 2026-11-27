@@ -85,7 +85,7 @@ void glyph_buf_hex2(glyph_buf *b, unsigned v)
 static const char *const code_names[GLYPH_CODE_COUNT] = {
     "OK", "IGNORED", "E_ARG", "E_SOURCE_SIZE", "E_CHAR", "E_STRING", "E_STR_LEN",
     "E_NAME_LEN", "E_NUMBER", "E_TOKENS", "E_SYNTAX", "E_UNCLOSED", "E_NEST",
-    "E_NODES", "E_NAMES", "E_STRPOOL", "E_UNKNOWN", "E_REDEFINE", "E_TOPLEVEL",
+    "E_CODE", "E_NAMES", "E_STRPOOL", "E_UNKNOWN", "E_REDEFINE", "E_TOPLEVEL",
     "E_UNDEFINED", "E_KIND", "E_LIMIT", "E_RANGE", "E_TYPE", "E_UNSET",
     "E_BUDGET", "E_DEPTH", "E_FAULTED", "E_STATE"
 };
@@ -136,6 +136,45 @@ void glyph_format_diag(glyph_buf *b, const glyph_diag *d)
         glyph_buf_ch(b, ' ');
         glyph_buf_str(b, d->msg);
     }
+}
+
+/* ---- values ---------------------------------------------------------------- */
+void val_copy(glyph_value *dst, const glyph_value *src)
+{
+    int i;
+    if (dst == src) return;
+    dst->type = src->type;
+    dst->len = src->len;
+    dst->i = src->i;
+    for (i = 0; i < src->len && i < GLYPH_MAX_STR_LEN; i++) dst->s[i] = src->s[i];
+    dst->s[i] = 0;
+}
+
+void val_int(glyph_value *v, int32_t i)
+{
+    v->type = GLYPH_T_INT; v->len = 0; v->i = i; v->s[0] = 0;
+}
+
+void val_str(glyph_value *v, const char *s, int n)
+{
+    int i;
+    if (n > GLYPH_MAX_STR_LEN) n = GLYPH_MAX_STR_LEN;
+    v->type = GLYPH_T_STR; v->i = 0;
+    for (i = 0; i < n; i++) v->s[i] = s[i];
+    v->s[n] = 0;
+    v->len = (uint8_t)n;
+}
+
+int format_int(char *out, int32_t v)
+{
+    char tmp[12];
+    int n = 0, len = 0;
+    uint32_t u = v < 0 ? (uint32_t)(-(int64_t)v) : (uint32_t)v;
+    if (v < 0) out[len++] = '-';
+    do { tmp[n++] = (char)('0' + (int)(u % 10u)); u /= 10u; } while (u);
+    while (n) out[len++] = tmp[--n];
+    out[len] = 0;
+    return len;
 }
 
 void g_result_reset(glyph_vm *vm, glyph_result *r)

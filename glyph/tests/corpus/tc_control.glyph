@@ -1,0 +1,12 @@
+; IF, IF with an else list (UCBLogo), IFELSE, WHILE, nested REPEAT, STOP.
+SCREEN 10 2
+SET a 0 SET b 0 SET c 0 SET d "" SET n 0 SET e 0 SET f 0 SET i 0 SET g 0
+IF 1 = 1 [SET a 1]
+IF 1 = 2 [SET a 99]
+IF 2 > 1 [SET b 1] [SET b 2]
+IF 2 < 1 [SET c 1] [SET c 2]
+IFELSE TRUE [SET d "yes"] [SET d "no"]
+WHILE :n < 10 [ADD n 3]                              ; 12
+REPEAT 3 [REPEAT 4 [ADD e 1]]                       ; 12
+WHILE :i < 5 [ADD i 1 IF (REMAINDER :i 2) = 1 [ADD f :i]]   ; 1 + 3 + 5 = 9
+ON half [ADD g 1 STOP ADD g 100]                     ; STOP ends the handler

@@ -37,7 +37,7 @@ FORK     := ..
 P2_DIR   := $(FORK)/02-baremetal-os
 P4_DIR   := $(FORK)/04-qwen38-27b-os
 
-.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean
+.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean reference
 
 all: $(BUILD)/glyph
 
@@ -124,7 +124,12 @@ baremetal-link: freestanding
 kernel-link: baremetal-link
 	sh tests/kernel_link.sh $(BUILD) $(FORK)
 
-check-all: test sanitize valgrind freestanding baremetal-link kernel-link
+check-all: test sanitize valgrind freestanding baremetal-link kernel-link reference
 
 clean:
 	rm -rf $(BUILD)
+
+# ---- independent reference (python3) ------------------------------------------
+# Busy beavers, Rule 110, recursion and the sieve checked against Python.
+reference: $(BUILD)/glyph
+	python3 -I tests/reference/check_tc.py $(BUILD)/glyph

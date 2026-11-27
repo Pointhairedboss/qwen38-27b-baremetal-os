@@ -95,7 +95,9 @@ TEST(lex_numbers)
     CHECK_CODE(run("FD -5"), GLYPH_OK);
     turtle(&x, &y, &h, &p);
     CHECK_EQ(y, 17);
-    CHECK_CODE(load("FD - 5"), GLYPH_E_CHAR);
+    CHECK_CODE(run("FD - 5"), GLYPH_OK);                 /* unary minus on an expression */
+    turtle(&x, &y, &h, &p);
+    CHECK_EQ(y, 17);
     CHECK_CODE(load("FD 1000000000"), GLYPH_E_NUMBER);
     CHECK_CODE(load("SET x 999999999"), GLYPH_OK);
     CHECK_CODE(load("FD 12abc"), GLYPH_E_NUMBER);
@@ -138,7 +140,7 @@ TEST(parse_structure_errors)
     CHECK_CODE(load("END"), GLYPH_E_SYNTAX);
     CHECK_CODE(load("REPEAT 2 [BUTTON b 0 0 \"x\" a]"), GLYPH_E_TOPLEVEL);
     CHECK_CODE(load("TO a TO b END END"), GLYPH_E_TOPLEVEL);
-    CHECK_CODE(load("FD \"far\""), GLYPH_E_SYNTAX);
+    CHECK_CODE(run("FD \"far\""), GLYPH_E_TYPE);      /* inputs are expressions, typed at run time */
     CHECK_CODE(load("FD"), GLYPH_E_SYNTAX);
     CHECK_CODE(load("SET fd 1"), GLYPH_E_SYNTAX);
     CHECK_CODE(load("REPEAT 3"), GLYPH_E_SYNTAX);
@@ -157,9 +159,12 @@ TEST(parse_link_errors)
     CHECK_CODE(load("ENABLE ghost"), GLYPH_E_UNDEFINED);
     CHECK_CODE(load("LABEL l 0 0 \"x\"\nDISABLE l"), GLYPH_E_KIND);
     CHECK_CODE(load("BUTTON b 0 0 \"x\" go"), GLYPH_E_UNDEFINED);
-    /* earliest error wins: line 2 before line 3 even though linked later */
-    CHECK_CODE(load("FD 1\nBUTTON b 0 0 \"x\" go\nnope"), GLYPH_E_UNDEFINED);
+    /* earliest link error wins: line 2 before line 3 */
+    CHECK_CODE(load("FD 1\nBUTTON b 0 0 \"x\" go\nFD :never"), GLYPH_E_UNDEFINED);
     CHECK_EQ(diag.line, 2);
+    /* unknown commands are found while parsing, before linking */
+    CHECK_CODE(load("FD 1\nBUTTON b 0 0 \"x\" go\nnope"), GLYPH_E_UNKNOWN);
+    CHECK_EQ(diag.line, 3);
     /* forward reference to a procedure is fine */
     CHECK_CODE(load("sq\nTO sq FD 1 END"), GLYPH_OK);
 }
@@ -619,17 +624,19 @@ TEST(malformed_inputs)
 }
 
 /* ---- 10. resource limits ------------------------------------------------------------- */
-TEST(limit_source_tokens_nodes)
+TEST(limit_source_tokens_code)
 {
     char *src = malloc(GLYPH_MAX_SOURCE + 2);
     memset(src, ' ', GLYPH_MAX_SOURCE + 1);
     CHECK_CODE(glyph_load(&vm, src, GLYPH_MAX_SOURCE, &diag), GLYPH_OK);
     CHECK_CODE(glyph_load(&vm, src, GLYPH_MAX_SOURCE + 1, &diag), GLYPH_E_SOURCE_SIZE);
     free(src);
-    CHECK_CODE(load(repeat_src("LINE 0 0 0 0\n", 819, "")), GLYPH_OK);       /* 4095 tokens */
-    CHECK_CODE(load(repeat_src("LINE 0 0 0 0\n", 820, "")), GLYPH_E_TOKENS);
-    CHECK_CODE(load(repeat_src("PU ", GLYPH_MAX_NODES - 1, "")), GLYPH_OK);
-    CHECK_CODE(load(repeat_src("PU ", GLYPH_MAX_NODES, "")), GLYPH_E_NODES);
+    /* "[]" is two tokens and one instruction, so tokens run out first */
+    CHECK_CODE(load(repeat_src("[] ", 2048, "")), GLYPH_OK);            /* 4096 tokens */
+    CHECK_CODE(load(repeat_src("[] ", 2049, "")), GLYPH_E_TOKENS);
+    /* 4094 PU + the final RET = 4095 instructions, the maximum */
+    CHECK_CODE(load(repeat_src("PU ", GLYPH_MAX_CODE - 2, "")), GLYPH_OK);
+    CHECK_CODE(load(repeat_src("PU ", GLYPH_MAX_CODE - 1, "")), GLYPH_E_CODE);
 }
 
 TEST(limit_nesting)
@@ -654,7 +661,7 @@ TEST(limit_tables)
     char src[8192];
     int i;
     src[0] = 0;
-    for (i = 0; i < 129; i++) sprintf(src + strlen(src), "n%d ", i);
+    for (i = 0; i < 129; i++) sprintf(src + strlen(src), "ENABLE n%d ", i);
     CHECK_CODE(load(src), GLYPH_E_NAMES);
     src[0] = 0;
     for (i = 0; i < 33; i++) sprintf(src + strlen(src), "TO p%d END ", i);
@@ -676,7 +683,7 @@ TEST(budget)
     CHECK_CODE(run("REPEAT 10000 PU"), GLYPH_OK);
     CHECK_EQ(res.steps, 20001);
     CHECK_CODE(run("REPEAT 10000 [REPEAT 10000 []]"), GLYPH_E_BUDGET);
-    CHECK_EQ(res.steps, GLYPH_MAX_STEPS);
+    CHECK_EQ(res.steps, GLYPH_DEFAULT_STEPS);
     CHECK_CODE(run("REPEAT 10000 [REPEAT 10000 [PU]]"), GLYPH_E_BUDGET);
     CHECK_CODE(run("REPEAT 200 [FD 1000]"), GLYPH_E_BUDGET);
     /* 1 + 100 * (1 iteration + 1 CLEAR + 1920 cells) = 192201 > 100000 */
@@ -700,6 +707,81 @@ TEST(budget_accounting)
     CHECK_CODE(glyph_action(&vm, "a", &res), GLYPH_E_BUDGET);
     glyph_set_budget(&vm, 0);                              /* 0 = default maximum */
     CHECK_CODE(run("REPEAT 10000 PU"), GLYPH_OK);
+}
+
+/* ---- 12. Turing-complete LOGO (v0.2) ------------------------------------------- */
+TEST(tc_minus_rule)
+{
+    int x, y, h, p;
+    CHECK_CODE(run("SCREEN 20 6 PU SETXY 10 -5"), GLYPH_OK);      /* two inputs */
+    turtle(&x, &y, &h, &p);
+    CHECK_EQ(x, 10); CHECK_EQ(y, -5);
+    CHECK_CODE(run("SET a 7 SET b :a-5 SET c :a - 5 SET d 3*-2"), GLYPH_OK);
+    CHECK_EQ(sint("b"), 2); CHECK_EQ(sint("c"), 2); CHECK_EQ(sint("d"), -6);
+    CHECK_CODE(load("SET a 7 FD :a -5"), GLYPH_E_SYNTAX);          /* -5 starts a new input */
+}
+
+TEST(tc_procedures_and_output)
+{
+    CHECK_CODE(run("TO sq :n OUTPUT :n * :n END SET a sq sq 3"), GLYPH_OK);
+    CHECK_EQ(sint("a"), 81);
+    CHECK_CODE(run("TO five OUTPUT 5 END five SET a 1"), GLYPH_OK);   /* output discarded */
+    CHECK_CODE(run("TO f :n IF :n > 0 [OUTPUT 1] END SET a f 0"), GLYPH_E_TYPE);
+    CHECK_CODE(run("SET a 1 STOP SET a 2"), GLYPH_OK);                 /* STOP ends main */
+    CHECK_EQ(sint("a"), 1);
+    CHECK_CODE(run("IF 1 = 1 [SET a 1] [SET a 2]"), GLYPH_OK);         /* else list */
+    CHECK_EQ(sint("a"), 1);
+    CHECK_CODE(run("SET a 0 TO up ADD a 1 END REPEAT 3 up"), GLYPH_OK); /* global from a procedure */
+    CHECK_EQ(sint("a"), 3);
+    CHECK_CODE(load("TO f :x END SET y :x"), GLYPH_E_UNDEFINED);        /* inputs are not global */
+}
+
+TEST(tc_recursion_values)
+{
+    CHECK_CODE(run("TO fact :n IF :n = 0 [OUTPUT 1] OUTPUT :n * fact :n - 1 END SET a fact 10"), GLYPH_OK);
+    CHECK_EQ(sint("a"), 3628800);
+    CHECK_CODE(run("TO fib :n IF :n < 2 [OUTPUT :n] OUTPUT (fib :n - 1) + (fib :n - 2) END SET a fib 20"), GLYPH_OK);
+    CHECK_EQ(sint("a"), 6765);
+    /* 64 nested calls are allowed, the 65th is not */
+    CHECK_CODE(run("TO d :n IF :n = 0 [OUTPUT 0] OUTPUT 1 + d :n - 1 END SET a d 63"), GLYPH_OK);
+    CHECK_EQ(sint("a"), 63);
+    CHECK_CODE(run("TO d :n IF :n = 0 [OUTPUT 0] OUTPUT 1 + d :n - 1 END SET a d 64"), GLYPH_E_DEPTH);
+}
+
+TEST(tc_arrays)
+{
+    CHECK_CODE(run("ARRAY v 5 SETITEM v 1 10 SETITEM v 5 50 SET s (ITEM v 1) + ITEM v 5"), GLYPH_OK);
+    CHECK_EQ(sint("s"), 60);
+    /* UCBLogo rule: a prefix reporter's input is a whole expression, so
+     * this is ITEM v (1 + ITEM v 5) = ITEM v 51 */
+    CHECK_CODE(run("ARRAY v 5 SETITEM v 5 50 SET s ITEM v 1 + ITEM v 5"), GLYPH_E_RANGE);
+    CHECK_EQ(glyph_array_count(&vm), 1);
+    CHECK_EQ(glyph_array_size(&vm, 0), 5);
+    CHECK_EQ(glyph_array_item(&vm, glyph_array_find(&vm, "v"), 5), 50);
+    CHECK_EQ(glyph_array_item(&vm, 0, 6), 0);
+    CHECK(strcmp(glyph_array_name(&vm, 0), "V") == 0);
+    CHECK_CODE(run("ARRAY v 5 SET s ITEM v 0"), GLYPH_E_RANGE);
+    CHECK_CODE(run("ARRAY v 5 SETITEM v 1 \"x\""), GLYPH_E_TYPE);
+    CHECK_CODE(load("ARRAY v 2049"), GLYPH_E_RANGE);
+    CHECK_CODE(load("ARRAY v 2000 ARRAY w 49"), GLYPH_E_LIMIT);
+    CHECK_CODE(load("ARRAY v 3 ARRAY v 3"), GLYPH_E_REDEFINE);
+    CHECK_CODE(load("SET s ITEM nothing 1"), GLYPH_E_UNDEFINED);
+}
+
+TEST(tc_budget_ceiling)
+{
+    /* 1 + 2 * 300000 = 600001 steps: too many for the default budget */
+    const char *loop = "SET i 0 WHILE :i < 300000 [ADD i 1]";
+    CHECK_CODE(run(loop), GLYPH_E_BUDGET);
+    glyph_set_budget(&vm, 1000000);
+    CHECK_CODE(run(loop), GLYPH_OK);
+    CHECK_EQ(res.steps, 600002);
+    CHECK_EQ(sint("i"), 300000);
+    glyph_set_budget(&vm, 4000000000u);                  /* clamped to the ceiling */
+    CHECK_CODE(run("SET i 0 WHILE 1 [ADD i 1]"), GLYPH_E_BUDGET);
+    CHECK_EQ(res.steps, GLYPH_MAX_STEPS);
+    glyph_set_budget(&vm, 0);                            /* back to the default */
+    CHECK_CODE(run(loop), GLYPH_E_BUDGET);
 }
 
 /* ---- shared runner over a scripted backend --------------------------------------------- */
@@ -784,11 +866,16 @@ int main(void)
     RUN(dispatch_start_error_faults);
     RUN(dispatch_determinism);
     RUN(malformed_inputs);
-    RUN(limit_source_tokens_nodes);
+    RUN(limit_source_tokens_code);
     RUN(limit_nesting);
     RUN(limit_tables);
     RUN(budget);
     RUN(budget_accounting);
+    RUN(tc_minus_rule);
+    RUN(tc_procedures_and_output);
+    RUN(tc_recursion_values);
+    RUN(tc_arrays);
+    RUN(tc_budget_ceiling);
     RUN(runner_loop);
     RUN(transcript_script_errors);
     printf("%d checks, %d failures\n", checks, failures);

@@ -1,0 +1,19 @@
+glyph 0.2
+load: ok code=33 names=6 components=0 state=6 arrays=0 procs=0 handlers=0
+main: ok steps=25 changed=A,B,C,D,H,H2 focus=-
+@ turtle -> x=15 y=3 heading=0 pen=down
+@ frame
+ 0|
+ 1|
+ 2|
+ 3|          ******
+ 4|               *
+ 5|               *
+@ state
+  A = 3
+  B = -2
+  C = 10
+  D = 3
+  H = 90
+  H2 = 350
+end

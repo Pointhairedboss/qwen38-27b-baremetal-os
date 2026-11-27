@@ -83,7 +83,7 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
   The program's canvas lives inside `glyph_vm` (see DECISIONS D6).
 - **Input.** `serial_try_getc()` first, then `ps2_try_getc()`, as `console_readline`
   does. Ctrl-D ends the session, ESC exits, and `pause` runs while idle.
-- **Storage.** `static glyph_vm` (47 KB) and a 32 KB transcript buffer in `.bss`.
+- **Storage.** `static glyph_vm` (85 KB in v0.2) and a 32 KB transcript buffer in `.bss`.
   No heap; nothing for `runtime.asm` to allocate.
 - **Entry points** (C, SysV):
   - `int glyph_bm_check(const char *src, uint64_t len)` prints one diagnostic line.
@@ -95,6 +95,10 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
   and `glyph_shell_transcript` realign RSP to 16 bytes, clear DF and forward the
   SysV arguments. Kernel assembly should call these rather than the C functions,
   because the kernel does not keep RSP aligned at every call site.
+- **Stack.** Execution needs a constant ~0.6 KiB of host stack whatever the LOGO
+  recursion depth, because the VM uses its own stacks. Loading needs up to about
+  18 KiB for the most deeply nested program the limits allow. Run Glyph on the
+  BSP stack (64 KiB), not on a 32 KiB AP stack.
 - **Compiler flags** (`FREESTANDING` in the Makefile): `-ffreestanding -fno-builtin
   -nostdlib -fno-pic -fno-pie -mcmodel=small -mno-red-zone -mgeneral-regs-only
   -fno-stack-protector -fno-asynchronous-unwind-tables
@@ -107,7 +111,7 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
 |---|---|---|
 | Core compiles with kernel flags, zero undefined symbols | `make freestanding` | pass |
 | Core + adapter + shims link against the fork's own `drivers.asm` (Phase 2 and Phase 4); every Glyph import resolves | `make baremetal-link` | pass. Only `g_boot_tsc` (needed by `drivers.asm`, provided by `boot.asm`) remains. |
-| Full link of the **unmodified** Phase 2 and Phase 4 kernels with the fork's linker scripts and ld flags, Glyph entry points kept with `ld -u` | `make kernel-link` | pass. Multiboot magic stays at file offset 4096. The baseline Phase 2 image is 24 252 B, the size the fork's README documents. With Glyph it is 61 600 B (`.text` +32.7 KB, `.bss` +80 KB). Phase 4 goes from 33 052 to 69 916 B. |
+| Full link of the **unmodified** Phase 2 and Phase 4 kernels with the fork's linker scripts and ld flags, Glyph entry points kept with `ld -u` | `make kernel-link` | pass. Multiboot magic stays at file offset 4096. The baseline Phase 2 image is 24 252 B, the size the fork's README documents. With Glyph v0.2 it is 77 752 B (`.text` +45.4 KB, `.bss` +118 KB). Phase 4 goes from 33 052 to 86 300 B. |
 
 **Not verified:** no boot in QEMU or on a P510. QEMU is not installed in this
 environment, and booting would mean adding a call site to `kernel.asm` (G4).
@@ -146,5 +150,5 @@ so any difference points at the platform.
   needs about 170 ms per full frame.
 - APs are idle in the spin barrier while the REPL runs. Glyph runs on the BSP only,
   between inference calls.
-- Phase 4: confirm that `.bss` growth (+80 KB) does not collide with
+- Phase 4: confirm that `.bss` growth (+118 KB) does not collide with
   the ivshmem BAR mapping or the paging layout.

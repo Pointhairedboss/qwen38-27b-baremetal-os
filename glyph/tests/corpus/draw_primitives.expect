@@ -1,5 +1,5 @@
-glyph 0.1
-load: ok nodes=16 names=1 components=0 state=1 procs=0 handlers=0
+glyph 0.2
+load: ok code=62 names=1 components=0 state=1 arrays=0 procs=0 handlers=0
 main: ok steps=265 changed=N focus=-
 @ frame
  0| Glyph  42

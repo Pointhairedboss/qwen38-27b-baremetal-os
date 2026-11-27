@@ -1,9 +1,9 @@
-glyph 0.1
-load: ok nodes=4 names=2 components=0 state=0 procs=0 handlers=2
+glyph 0.2
+load: ok code=18 names=2 components=0 state=0 arrays=0 procs=0 handlers=2
 main: ok steps=0 focus=-
 @ action spin -> error action=SPIN steps=100000 focus=-
-  ! E_BUDGET step budget of 100000 exhausted
+  ! E_BUDGET 4:23 step budget of 100000 exhausted
 @ action ok -> ok action=OK steps=20001 focus=-
 @ action spin -> error action=SPIN steps=100000 focus=-
-  ! E_BUDGET step budget of 100000 exhausted
+  ! E_BUDGET 4:23 step budget of 100000 exhausted
 end

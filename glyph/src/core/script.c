@@ -161,6 +161,19 @@ static void dump_state(glyph_buf *b, const glyph_vm *vm)
         }
         glyph_buf_ch(b, '\n');
     }
+    for (i = 0; i < glyph_array_count(vm); i++) {
+        int k, n = glyph_array_size(vm, i);
+        glyph_buf_str(b, "  ");
+        glyph_buf_str(b, glyph_array_name(vm, i));
+        glyph_buf_ch(b, '[');
+        glyph_buf_int(b, n);
+        glyph_buf_str(b, "] =");
+        for (k = 1; k <= n; k++) {
+            glyph_buf_ch(b, ' ');
+            glyph_buf_int(b, glyph_array_item(vm, i, k));
+        }
+        glyph_buf_ch(b, '\n');
+    }
 }
 
 /* ---- keys ----------------------------------------------------------------- */
@@ -274,11 +287,12 @@ int glyph_transcript(glyph_vm *vm, const char *src, size_t srclen,
         glyph_buf_str(b, "\nend\n");
         return GLYPH_OK;
     }
-    glyph_buf_str(b, "load: ok nodes=");
-    glyph_buf_int(b, vm->n_nodes - 1);
+    glyph_buf_str(b, "load: ok code=");
+    glyph_buf_int(b, vm->n_code - 1);
     glyph_buf_str(b, " names=");      glyph_buf_int(b, vm->n_syms);
     glyph_buf_str(b, " components="); glyph_buf_int(b, vm->n_comps);
     glyph_buf_str(b, " state=");      glyph_buf_int(b, vm->n_state);
+    glyph_buf_str(b, " arrays=");     glyph_buf_int(b, vm->n_arrays);
     glyph_buf_str(b, " procs=");      glyph_buf_int(b, vm->n_procs);
     glyph_buf_str(b, " handlers=");   glyph_buf_int(b, vm->n_handlers);
     glyph_buf_ch(b, '\n');

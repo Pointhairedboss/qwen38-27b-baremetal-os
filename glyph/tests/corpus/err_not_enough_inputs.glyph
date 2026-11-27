@@ -1,0 +1,3 @@
+; Malformed: the program ends before all inputs are given.
+TO sq :n FD :n END
+sq

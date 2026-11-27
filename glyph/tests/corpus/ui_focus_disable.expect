@@ -1,5 +1,5 @@
-glyph 0.1
-load: ok nodes=11 names=8 components=4 state=1 procs=0 handlers=3
+glyph 0.2
+load: ok code=21 names=8 components=4 state=1 arrays=0 procs=0 handlers=3
 main: ok steps=2 changed=LOCKED focus=A
 @ frame
  0|> A <[ Lock ]( Unlock )

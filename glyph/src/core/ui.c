@@ -12,9 +12,9 @@ void glyph_init(glyph_vm *vm)
     vm->phase = GLYPH_PHASE_EMPTY;
     vm->w = GLYPH_DEFAULT_W;
     vm->h = GLYPH_DEFAULT_H;
-    vm->n_nodes = 1;                       /* node 0 means "none" */
+    vm->n_code = 1;                        /* instruction 0 means "none" */
     vm->focus = -1;
-    vm->budget = GLYPH_MAX_STEPS;
+    vm->budget = GLYPH_DEFAULT_STEPS;
     canvas_reset(vm);
     turtle_home(vm);
 }
@@ -22,7 +22,7 @@ void glyph_init(glyph_vm *vm)
 void glyph_set_budget(glyph_vm *vm, uint32_t steps)
 {
     if (!vm) return;
-    vm->budget = (steps == 0 || steps > GLYPH_MAX_STEPS) ? GLYPH_MAX_STEPS : steps;
+    vm->budget = steps == 0 ? GLYPH_DEFAULT_STEPS : steps > GLYPH_MAX_STEPS ? GLYPH_MAX_STEPS : steps;
 }
 
 int glyph_load(glyph_vm *vm, const char *src, size_t len, glyph_diag *d)
@@ -31,7 +31,7 @@ int glyph_load(glyph_vm *vm, const char *src, size_t len, glyph_diag *d)
     int e;
     if (!vm) return GLYPH_E_ARG;
     if (!d) d = &vm->diag;
-    budget = vm->budget ? vm->budget : GLYPH_MAX_STEPS;
+    budget = vm->budget ? vm->budget : GLYPH_DEFAULT_STEPS;
     glyph_init(vm);
     vm->budget = budget;
     g_diag(d, GLYPH_OK, 0, 0, 0, 0, 0);
@@ -139,7 +139,7 @@ int glyph_start(glyph_vm *vm, glyph_result *r)
         return finish(vm, r, GLYPH_E_STATE);
     }
     clear_dirty(vm);
-    e = exec_entry(vm, vm->main_head, &r->diag);
+    e = exec_entry(vm, 0, &r->diag);
     r->steps = vm->steps;
     if (e) {
         vm->phase = GLYPH_PHASE_FAULTED;
@@ -158,7 +158,7 @@ static int fire(glyph_vm *vm, int sym, glyph_result *r)
     int e;
     if (!(vm->syms[sym].flags & GLYPH_SYM_HANDLER)) return finish(vm, r, GLYPH_IGNORED);
     r->action = sym;
-    e = exec_entry(vm, vm->syms[sym].handler_body, &r->diag);
+    e = exec_entry(vm, vm->syms[sym].handler_unit, &r->diag);
     r->steps = vm->steps;
     return finish(vm, r, e);
 }
@@ -167,13 +167,13 @@ static int fire(glyph_vm *vm, int sym, glyph_result *r)
 /* Current field text into buf (>= 64 bytes); returns length. */
 static int field_text(const glyph_vm *vm, const glyph_comp *c, char *buf)
 {
-    const glyph_state *st = &vm->state[vm->syms[c->sym].state];
+    const glyph_value *v = &vm->state[vm->syms[c->sym].state].v;
     int i;
-    if (st->type == GLYPH_T_INT) return format_int(buf, st->i);
-    if (st->type != GLYPH_T_STR) { buf[0] = 0; return 0; }
-    for (i = 0; i < st->len; i++) buf[i] = st->s[i];
-    buf[st->len] = 0;
-    return st->len;
+    if (v->type == GLYPH_T_INT) return format_int(buf, v->i);
+    if (v->type != GLYPH_T_STR) { buf[0] = 0; return 0; }
+    for (i = 0; i < v->len; i++) buf[i] = v->s[i];
+    buf[v->len] = 0;
+    return v->len;
 }
 
 static int field_edit(glyph_vm *vm, const glyph_comp *c, int key)
@@ -189,7 +189,11 @@ static int field_edit(glyph_vm *vm, const glyph_comp *c, int key)
         if (len >= width || len >= GLYPH_MAX_STR_LEN) return GLYPH_IGNORED;
         buf[len++] = (char)key;
     }
-    state_set_str(vm, slot, buf, len);
+    {
+        glyph_value nv;
+        val_str(&nv, buf, len);
+        state_set(vm, slot, &nv);
+    }
     return GLYPH_OK;
 }
 
@@ -314,9 +318,9 @@ static void draw_comp_row(glyph_vm *vm, int ci, int y)
             row_text(vm, c->x, &vm->strpool[STR_OFF(c->bind)], n, GLYPH_ATTR_LABEL);
             return;
         } else {
-            const glyph_state *st = &vm->state[vm->syms[c->bind].state];
-            if (st->type == GLYPH_T_INT) n = format_int(buf, st->i);
-            else if (st->type == GLYPH_T_STR) { row_text(vm, c->x, st->s, st->len, GLYPH_ATTR_LABEL); return; }
+            const glyph_value *v = &vm->state[vm->syms[c->bind].state].v;
+            if (v->type == GLYPH_T_INT) n = format_int(buf, v->i);
+            else if (v->type == GLYPH_T_STR) { row_text(vm, c->x, v->s, v->len, GLYPH_ATTR_LABEL); return; }
             else n = 0;
         }
         row_text(vm, c->x, buf, n, GLYPH_ATTR_LABEL);
@@ -370,15 +374,33 @@ const char *glyph_state_name(const glyph_vm *vm, int i)
 {
     return state_ok(vm, i) ? vm->syms[vm->state[i].sym].name : "";
 }
-int glyph_state_type(const glyph_vm *vm, int i) { return state_ok(vm, i) ? vm->state[i].type : GLYPH_T_UNSET; }
-int32_t glyph_state_int(const glyph_vm *vm, int i) { return state_ok(vm, i) ? vm->state[i].i : 0; }
-const char *glyph_state_str(const glyph_vm *vm, int i) { return state_ok(vm, i) ? vm->state[i].s : ""; }
+int glyph_state_type(const glyph_vm *vm, int i) { return state_ok(vm, i) ? vm->state[i].v.type : GLYPH_T_UNSET; }
+int32_t glyph_state_int(const glyph_vm *vm, int i) { return state_ok(vm, i) ? vm->state[i].v.i : 0; }
+const char *glyph_state_str(const glyph_vm *vm, int i) { return state_ok(vm, i) ? vm->state[i].v.s : ""; }
 int glyph_state_dirty(const glyph_vm *vm, int i) { return state_ok(vm, i) ? vm->state[i].dirty : 0; }
 
 int glyph_state_find(const glyph_vm *vm, const char *name)
 {
     int s = vm ? find_name(vm, name) : -1;
     return s < 0 ? -1 : vm->syms[s].state;
+}
+
+int glyph_array_count(const glyph_vm *vm) { return vm ? vm->n_arrays : 0; }
+static int array_ok(const glyph_vm *vm, int i) { return vm && i >= 0 && i < vm->n_arrays; }
+const char *glyph_array_name(const glyph_vm *vm, int i)
+{
+    return array_ok(vm, i) ? vm->syms[vm->arrays[i].sym].name : "";
+}
+int glyph_array_size(const glyph_vm *vm, int i) { return array_ok(vm, i) ? vm->arrays[i].size : 0; }
+int32_t glyph_array_item(const glyph_vm *vm, int i, int index)
+{
+    if (!array_ok(vm, i) || index < 1 || index > vm->arrays[i].size) return 0;
+    return vm->cells[vm->arrays[i].base + index - 1];
+}
+int glyph_array_find(const glyph_vm *vm, const char *name)
+{
+    int s = vm ? find_name(vm, name) : -1;
+    return s < 0 ? -1 : vm->syms[s].array;
 }
 
 int glyph_comp_count(const glyph_vm *vm) { return vm ? vm->n_comps : 0; }

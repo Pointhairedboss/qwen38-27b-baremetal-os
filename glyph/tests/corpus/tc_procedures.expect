@@ -1,0 +1,10 @@
+glyph 0.2
+load: ok code=128 names=17 components=0 state=5 arrays=0 procs=5 handlers=0
+main: ok steps=28370 changed=FIB18,FACT12,HANOI9,ACK23,GCD focus=-
+@ state
+  FIB18 = 2584
+  FACT12 = 479001600
+  HANOI9 = 511
+  ACK23 = 9
+  GCD = 21
+end

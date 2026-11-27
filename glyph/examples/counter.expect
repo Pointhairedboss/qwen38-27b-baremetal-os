@@ -1,5 +1,5 @@
-glyph 0.1
-load: ok nodes=4 names=10 components=6 state=1 procs=0 handlers=3
+glyph 0.2
+load: ok code=15 names=10 components=6 state=1 arrays=0 procs=0 handlers=3
 main: ok steps=1 changed=COUNT focus=DEC
 @ key TAB -> ok focus=INC
 @ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC

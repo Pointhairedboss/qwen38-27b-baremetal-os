@@ -1,0 +1,10 @@
+glyph 0.2
+load: ok code=48 names=9 components=0 state=5 arrays=0 procs=3 handlers=0
+main: ok steps=166 changed=X,Y,TOTAL,R1,R2 focus=-
+@ state
+  X = 100
+  Y = 2
+  TOTAL = 30
+  R1 = 2
+  R2 = 42
+end

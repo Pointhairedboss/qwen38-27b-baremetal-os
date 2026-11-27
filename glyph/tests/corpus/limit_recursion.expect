@@ -1,9 +1,9 @@
-glyph 0.1
-load: ok nodes=3 names=2 components=0 state=0 procs=1 handlers=1
+glyph 0.2
+load: ok code=9 names=2 components=0 state=0 arrays=0 procs=1 handlers=1
 main: ok steps=0 focus=-
-@ action go -> error action=GO steps=49 focus=-
-  ! E_DEPTH 3:14 procedure calls nested deeper than 16 (DOWN)
-@ turtle -> x=5 y=-15 heading=0 pen=down
-@ action go -> error action=GO steps=49 focus=-
-  ! E_DEPTH 3:14 procedure calls nested deeper than 16 (DOWN)
+@ action go -> error action=GO steps=193 focus=-
+  ! E_DEPTH 3:14 procedure calls nested deeper than 64 (DOWN)
+@ turtle -> x=5 y=-63 heading=0 pen=down
+@ action go -> error action=GO steps=193 focus=-
+  ! E_DEPTH 3:14 procedure calls nested deeper than 64 (DOWN)
 end

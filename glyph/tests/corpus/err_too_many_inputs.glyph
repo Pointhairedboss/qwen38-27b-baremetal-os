@@ -1,0 +1,3 @@
+; Malformed: more inputs than the procedure takes.
+TO sq :n FD :n END
+sq 1 2

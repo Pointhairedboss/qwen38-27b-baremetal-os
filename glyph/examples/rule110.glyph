@@ -1,0 +1,50 @@
+; rule110.glyph — Rule 110, an elementary cellular automaton that is
+; Turing complete (Cook, 2004), computed in Glyph.
+;
+;   glyph run examples/rule110.glyph
+;
+; 80 cells wrapping around, one live cell at the right edge, 24 generations,
+; one per screen row. Each new cell is ITEM rule (4*left + 2*self + right + 1).
+; The output is checked cell for cell against an independent Python
+; implementation by tests/reference/check_tc.py.
+
+SCREEN 80 24
+
+ARRAY cur 80
+ARRAY nxt 80
+ARRAY rule 8           ; bit p of 110, p = 4*left + 2*self + right
+SETITEM rule 2 1  SETITEM rule 3 1  SETITEM rule 4 1
+SETITEM rule 6 1  SETITEM rule 7 1  ; 110 = 0b01101110
+
+TO west :i
+  OUTPUT ITEM cur (REMAINDER :i + 78 80) + 1
+END
+
+TO east :i
+  OUTPUT ITEM cur (REMAINDER :i 80) + 1
+END
+
+TO generation
+  LOCAL i
+  SET i 1
+  WHILE :i <= 80 [
+    SETITEM nxt :i ITEM rule 4 * (west :i) + 2 * (ITEM cur :i) + (east :i) + 1
+    ADD i 1
+  ]
+  SET i 1
+  WHILE :i <= 80 [SETITEM cur :i ITEM nxt :i ADD i 1]
+END
+
+TO draw :row
+  LOCAL i
+  SET i 1
+  WHILE :i <= 80 [
+    IF (ITEM cur :i) = 1 [TEXT :i - 1 :row "#"]
+    ADD i 1
+  ]
+END
+
+SETITEM cur 80 1
+SET row 0
+COLOR 10 0
+REPEAT 24 [draw :row generation ADD row 1]

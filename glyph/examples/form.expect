@@ -1,5 +1,5 @@
-glyph 0.1
-load: ok nodes=4 names=10 components=7 state=4 procs=0 handlers=1
+glyph 0.2
+load: ok code=11 names=10 components=7 state=4 arrays=0 procs=0 handlers=1
 main: ok steps=2 changed=STATUS,SENT focus=NAME
 @ type "Ada" -> ok changed=NAME focus=NAME
 @ key TAB -> ok focus=NODE

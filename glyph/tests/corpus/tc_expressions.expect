@@ -1,0 +1,29 @@
+glyph 0.2
+load: ok code=105 names=24 components=0 state=24 arrays=0 procs=0 handlers=0
+main: ok steps=24 changed=P1,P2,P3,P4,P5,P6,P7,P8,P9,M1,M2,C1,C2,C3,C4,C5,L1,L2,L3,T,W1,W2,S1,S2 focus=-
+@ state
+  P1 = 14
+  P2 = 20
+  P3 = 6
+  P4 = -6
+  P5 = 2
+  P6 = -2
+  P7 = 3
+  P8 = -6
+  P9 = -5
+  M1 = 6
+  M2 = 6
+  C1 = 1
+  C2 = 0
+  C3 = 1
+  C4 = 1
+  C5 = 0
+  L1 = 0
+  L2 = 1
+  L3 = 1
+  T = 2
+  W1 = "x=42"
+  W2 = "abc"
+  S1 = 999999999
+  S2 = -999999999
+end

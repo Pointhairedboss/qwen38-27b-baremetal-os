@@ -1,0 +1,28 @@
+; Runtime errors fail one input with a positioned diagnostic and leave the
+; session usable.
+SCREEN 10 2
+ARRAY a 3
+SET x 0
+TO noout :n
+  IF :n > 0 [OUTPUT 1]
+END
+TO deep :n
+  OUTPUT 1 + (2 + (3 + deep :n + 1))
+END
+TO eight :a :b :c :d :e :f :g :h
+  eight :a + 1 :b :c :d :e :f :g :h
+END
+TO down :n
+  down :n + 1
+END
+ON div [SET x 1 / 0]
+ON nooutput [SET x noout 0]
+ON range [SET x ITEM a 4]
+ON setrange [SETITEM a 0 1]
+ON longword [SET x WORD "0123456789012345678901234567890123456789" "0123456789012345678901234567890"]
+ON vstack [SET x deep 1]
+ON locals [eight 1 2 3 4 5 6 7 8]
+ON depth [down 1]
+ON spin [WHILE 1 []]
+ON typeif [IF "yes" [SET x 1]]
+ON fine [SET x 7]

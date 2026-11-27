@@ -1,10 +1,10 @@
-glyph 0.1
-load: ok nodes=6 names=4 components=0 state=1 procs=0 handlers=3
+glyph 0.2
+load: ok code=21 names=4 components=0 state=1 arrays=0 procs=0 handlers=3
 main: ok steps=1 changed=N focus=-
 @ action big -> error action=BIG steps=1 focus=-
-  ! E_RANGE 3:8 REPEAT argument 10001 out of range 0..10000
+  ! E_RANGE 3:8 REPEAT input 10001 out of range 0..10000
 @ action neg -> error action=NEG steps=1 focus=-
-  ! E_RANGE 4:8 REPEAT argument -1 out of range 0..10000
+  ! E_RANGE 4:8 REPEAT input -1 out of range 0..10000
 @ action far -> error action=FAR steps=1 focus=-
-  ! E_RANGE 5:8 FD argument -1001 out of range -1000..1000
+  ! E_RANGE 5:8 FD input -1001 out of range -1000..1000
 end

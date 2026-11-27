@@ -1,0 +1,16 @@
+; Arrays: the sieve of Eratosthenes, primes up to 200 (checked against
+; Python by tests/reference/check_tc.py).
+SCREEN 10 2
+ARRAY composite 200
+ARRAY primes 64
+SET count 0
+SET i 2
+WHILE :i <= 200 [
+  IF (ITEM composite :i) = 0 [
+    ADD count 1
+    SETITEM primes :count :i
+    SET j :i * :i
+    WHILE :j <= 200 [SETITEM composite :j 1 ADD j :i]
+  ]
+  ADD i 1
+]

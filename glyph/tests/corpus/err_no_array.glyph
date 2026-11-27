@@ -1,0 +1,2 @@
+; Malformed: SETITEM on an undeclared array.
+SETITEM tape 1 1

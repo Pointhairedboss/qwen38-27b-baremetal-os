@@ -1,0 +1,10 @@
+; HOME, SETXY (draws like FD: every cell but the last), SETHEADING and the
+; XCOR/YCOR/HEADING reporters. "SETXY 3 -2" is two inputs (minus rule).
+SCREEN 20 6
+PU SETXY 3 -2 SET a XCOR SET b YCOR
+HOME SET c XCOR SET d YCOR
+SETH 450 SET h HEADING
+RT -100 SET h2 HEADING
+PD SETXY 15 3
+SETXY 15 5
+SETH 0 FD 2

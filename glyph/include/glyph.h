@@ -34,7 +34,7 @@ enum {
     GLYPH_E_SYNTAX,
     GLYPH_E_UNCLOSED,
     GLYPH_E_NEST,
-    GLYPH_E_NODES,
+    GLYPH_E_CODE,         /* program needs more bytecode than GLYPH_MAX_CODE */
     GLYPH_E_NAMES,
     GLYPH_E_STRPOOL,
     GLYPH_E_UNKNOWN,
@@ -92,29 +92,48 @@ typedef struct glyph_result {
     int        action;    /* symbol index of the fired action, or -1 */
     int        focus;     /* focused component index after the input, or -1 */
     uint32_t   steps;     /* steps used by this execution entry */
-    int        changed;   /* number of state variables whose value changed */
+    int        changed;   /* number of global variables whose value changed */
     glyph_diag diag;      /* filled when status is an error */
 } glyph_result;
 
+/* ---- values ------------------------------------------------------------------ */
+enum { GLYPH_T_UNSET = 0, GLYPH_T_INT, GLYPH_T_STR };
+
+typedef struct glyph_value {
+    uint8_t  type;        /* GLYPH_T_* */
+    uint8_t  len;         /* string length */
+    uint8_t  pad[2];
+    int32_t  i;
+    char     s[GLYPH_MAX_STR_LEN + 1];
+} glyph_value;
+
 /* ---- internal representation (exposed only so callers can allocate) ----- */
-typedef struct glyph_node {
+typedef struct glyph_insn {   /* one bytecode instruction */
     uint8_t  op;          /* GLYPH_OP_* (glyph_internal.h) */
-    uint8_t  kinds;       /* 2 bits per operand: none/int/str/var */
-    uint16_t line, col;
-    uint16_t body;        /* first node of a body, or procedure symbol for CALL */
-    uint16_t next;        /* next node in the sequence; 0 ends it */
-    int32_t  a[4];        /* operands */
-} glyph_node;
+    uint8_t  col;         /* source column, clamped to 255 */
+    uint16_t line;
+    int32_t  arg;
+} glyph_insn;
+
+typedef struct glyph_unit {   /* main, one procedure (TO) or one handler (ON) */
+    uint16_t entry;       /* first instruction */
+    uint16_t sym;         /* procedure/action symbol; 0xFFFF for main */
+    uint8_t  nparams;
+    uint8_t  nlocals;     /* inputs + loop counters + LOCAL names */
+    uint8_t  pad[2];
+} glyph_unit;
 
 typedef struct glyph_sym {
     char     name[GLYPH_MAX_NAME_LEN + 1];
     uint8_t  flags;       /* GLYPH_SYM_* */
+    uint8_t  arity;       /* procedure inputs, from the pre-scan */
     int8_t   comp;        /* component index or -1 */
-    int8_t   state;       /* state slot or -1 */
+    int8_t   state;       /* global variable slot or -1 */
+    int8_t   array;       /* array index or -1 */
+    uint8_t  proc_unit;   /* unit of the TO body (valid if GLYPH_SYM_PROC) */
+    uint8_t  handler_unit;/* unit of the ON body (valid if GLYPH_SYM_HANDLER) */
     uint8_t  pad;
-    uint16_t proc_body;   /* TO body head (valid if GLYPH_SYM_PROC) */
-    uint16_t handler_body;/* ON body head (valid if GLYPH_SYM_HANDLER) */
-    uint16_t line, col;   /* first reference, for link diagnostics */
+    uint16_t line, col;   /* first reference, for diagnostics */
 } glyph_sym;
 
 typedef struct glyph_comp {
@@ -130,21 +149,26 @@ typedef struct glyph_comp {
     uint16_t line, col;
 } glyph_comp;
 
-typedef struct glyph_state {
-    uint16_t sym;
-    uint8_t  type;        /* GLYPH_T_UNSET / INT / STR */
-    uint8_t  dirty;       /* value changed during the current entry */
-    int32_t  i;
-    uint8_t  len;
-    char     s[GLYPH_MAX_STR_LEN + 1];
+typedef struct glyph_state {  /* one global variable */
+    uint16_t    sym;
+    uint8_t     dirty;    /* value changed during the current entry */
+    uint8_t     pad;
+    glyph_value v;
 } glyph_state;
 
-typedef struct glyph_frame {
-    uint16_t pc;          /* next node to run; 0 = end of sequence */
-    uint16_t body;        /* sequence head to restart for REPEAT */
-    int32_t  remaining;   /* REPEAT iterations still to start */
-    uint8_t  is_call;
-    uint8_t  pad[3];
+typedef struct glyph_array {
+    uint16_t sym;
+    uint16_t base;        /* first cell in glyph_vm.cells */
+    uint16_t size;
+    uint16_t line;
+} glyph_array;
+
+typedef struct glyph_frame {  /* one active call */
+    uint16_t ret_pc;      /* instruction to resume in the caller */
+    uint16_t unit;
+    uint16_t base;        /* first local slot */
+    uint8_t  want;        /* called as a reporter: must OUTPUT */
+    uint8_t  pad;
 } glyph_frame;
 
 typedef struct glyph_lexer {
@@ -154,28 +178,44 @@ typedef struct glyph_lexer {
     uint32_t    ntokens;
     /* current token */
     uint8_t     type;
+    uint8_t     op;       /* operator code for TOK_OP */
+    uint8_t     unary;    /* '-' that starts a new input (UCBLogo spacing rule) */
     uint16_t    tline, tcol;
     int32_t     ival;
     uint8_t     tlen;
     char        text[GLYPH_MAX_STR_LEN + 1];
 } glyph_lexer;
 
+typedef struct glyph_parse {  /* compiler state, load time only */
+    uint16_t unit;            /* unit being compiled */
+    uint8_t  in_proc;
+    uint8_t  nparams;
+    uint8_t  loop_depth, max_loop;
+    uint8_t  nlocal_names;
+    uint8_t  expr_depth;
+    uint16_t local_names[GLYPH_MAX_UNIT_LOCALS];
+} glyph_parse;
+
 typedef struct glyph_vm {
     uint8_t     phase;               /* GLYPH_PHASE_* */
     uint8_t     w, h, screen_set;
     /* program (built by glyph_load) */
-    glyph_node  nodes[GLYPH_MAX_NODES];
-    uint16_t    n_nodes;
-    uint16_t    main_head, main_tail;
+    glyph_insn  code[GLYPH_MAX_CODE];
+    uint16_t    n_code;
+    glyph_unit  units[GLYPH_MAX_UNITS];
+    uint8_t     n_units, n_procs, n_handlers;
     glyph_sym   syms[GLYPH_MAX_NAMES];
     uint16_t    n_syms;
-    uint8_t     n_procs, n_handlers;
     char        strpool[GLYPH_MAX_STRPOOL];
     uint16_t    strpool_len;
     glyph_comp  comps[GLYPH_MAX_COMPONENTS];
     uint8_t     n_comps;
     glyph_state state[GLYPH_MAX_STATE];
     uint8_t     n_state;
+    glyph_array arrays[GLYPH_MAX_ARRAYS];
+    uint8_t     n_arrays;
+    uint16_t    n_cells;
+    int32_t     cells[GLYPH_MAX_ARRAY_CELLS];
     /* canvas and turtle */
     glyph_cell  canvas[GLYPH_MAX_W * GLYPH_MAX_H];
     glyph_cell  row[GLYPH_MAX_W];    /* render scratch */
@@ -184,12 +224,15 @@ typedef struct glyph_vm {
     uint8_t     pen, attr;
     /* execution */
     int8_t      focus;
-    uint8_t     depth;
-    glyph_frame frames[GLYPH_MAX_FRAMES];
-    uint16_t    sp;
+    uint8_t     fp;                  /* active frames */
+    glyph_frame frames[GLYPH_MAX_CALL_DEPTH + 1];
+    uint16_t    vsp, lsp;
+    glyph_value vstack[GLYPH_MAX_VSTACK];
+    glyph_value locals[GLYPH_MAX_LOCALS];
     uint32_t    steps, budget;
     /* load-time */
     glyph_lexer lex;
+    glyph_parse ps;
     glyph_diag  diag;                /* last load or start error */
 } glyph_vm;
 
@@ -199,8 +242,8 @@ size_t glyph_vm_size(void);
 /* Reset vm to the empty state. Always succeeds. */
 void glyph_init(glyph_vm *vm);
 
-/* Lex, parse and link a program. On failure vm is left empty and d holds the
- * diagnostic. d may be NULL. Returns GLYPH_OK or an error code. */
+/* Lex, parse and compile a program. On failure vm is left empty and d holds
+ * the diagnostic. d may be NULL. Returns GLYPH_OK or an error code. */
 int glyph_load(glyph_vm *vm, const char *src, size_t len, glyph_diag *d);
 
 /* Run the main sequence once. r may be NULL. A runtime error faults the
@@ -215,7 +258,8 @@ int glyph_action(glyph_vm *vm, const char *name, glyph_result *r);
 /* Diagnostic of the last failed glyph_load or glyph_start (code GLYPH_OK if none). */
 const glyph_diag *glyph_last_diag(const glyph_vm *vm);
 
-/* Lower (never raise above GLYPH_MAX_STEPS) the per-entry step budget. */
+/* Set the per-entry step budget: 0 restores GLYPH_DEFAULT_STEPS; values above
+ * GLYPH_MAX_STEPS are clamped. Survives glyph_load. */
 void glyph_set_budget(glyph_vm *vm, uint32_t steps);
 
 /* ---- output ------------------------------------------------------------- */
@@ -226,8 +270,6 @@ int  glyph_width(const glyph_vm *vm);
 int  glyph_height(const glyph_vm *vm);
 
 /* ---- introspection -------------------------------------------------------- */
-enum { GLYPH_T_UNSET = 0, GLYPH_T_INT, GLYPH_T_STR };
-
 int         glyph_state_count(const glyph_vm *vm);
 const char *glyph_state_name(const glyph_vm *vm, int i);
 int         glyph_state_type(const glyph_vm *vm, int i);
@@ -235,6 +277,12 @@ int32_t     glyph_state_int(const glyph_vm *vm, int i);
 const char *glyph_state_str(const glyph_vm *vm, int i);
 int         glyph_state_dirty(const glyph_vm *vm, int i);
 int         glyph_state_find(const glyph_vm *vm, const char *name); /* -1 if none */
+
+int         glyph_array_count(const glyph_vm *vm);
+const char *glyph_array_name(const glyph_vm *vm, int i);
+int         glyph_array_size(const glyph_vm *vm, int i);
+int32_t     glyph_array_item(const glyph_vm *vm, int i, int index); /* 1-based; 0 if out of range */
+int         glyph_array_find(const glyph_vm *vm, const char *name); /* -1 if none */
 
 int         glyph_comp_count(const glyph_vm *vm);
 const char *glyph_comp_name(const glyph_vm *vm, int i);

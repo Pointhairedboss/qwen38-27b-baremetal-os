@@ -1,0 +1,3 @@
+glyph 0.2
+load: error E_REDEFINE 2:1 A is both an ARRAY and a variable
+end

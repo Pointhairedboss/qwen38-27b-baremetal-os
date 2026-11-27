@@ -1,0 +1,32 @@
+; tree.glyph — classic LOGO recursion: a procedure with inputs that calls
+; itself twice, drawing a binary tree with the turtle.
+;
+;   glyph run examples/tree.glyph
+
+SCREEN 64 22
+
+TO tree :len :depth
+  IF :depth = 0 [STOP]
+  FD :len
+  LT 30 tree :len * 3 / 4 :depth - 1
+  RT 60 tree :len * 3 / 4 :depth - 1
+  LT 30 BK :len
+END
+
+TO fib :n
+  IF :n < 2 [OUTPUT :n]
+  OUTPUT (fib :n - 1) + (fib :n - 2)
+END
+
+TO fact :n
+  IF :n = 0 [OUTPUT 1]
+  OUTPUT :n * fact :n - 1
+END
+
+PU SETXY 32 21 PD
+COLOR 10 0
+tree 7 6
+COLOR 14 0
+TEXT 0 0 WORD "fib 20 = " fib 20
+TEXT 0 1 WORD "12!    = " fact 12
+COLOR 7 0

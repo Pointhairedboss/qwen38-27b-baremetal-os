@@ -1,0 +1,3 @@
+; Malformed: one name used as an ARRAY and as a variable.
+ARRAY a 3
+SET a 1
