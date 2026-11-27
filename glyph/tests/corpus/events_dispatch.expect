@@ -1,0 +1,15 @@
+glyph 0.1
+load: ok nodes=7 names=4 components=0 state=1 procs=0 handlers=3
+main: ok steps=1 changed=N focus=-
+@ action bump -> ok action=BUMP steps=1 changed=N focus=-
+@ action BUMP -> ok action=BUMP steps=1 changed=N focus=-
+@ action missing -> ignored focus=-
+@ action fail -> error action=FAIL steps=2 changed=N focus=-
+  ! E_RANGE 6:20 FD argument 5000 out of range -1000..1000
+@ action bump -> ok action=BUMP steps=1 changed=N focus=-
+@ action draw -> ok action=DRAW steps=13 focus=-
+@ key TAB -> ignored focus=-
+@ key ENTER -> ignored focus=-
+@ state
+  N = 103
+end

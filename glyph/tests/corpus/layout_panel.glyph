@@ -1,0 +1,14 @@
+; Layout: panel with a title, static and bound labels, buttons, a field,
+; a disabled control, clipping at the screen edge.
+SCREEN 32 8
+SET who "world"
+PANEL main 0 0 32 7 "Layout demo"
+LABEL greet 2 1 "Hello,"
+LABEL name 9 1 :who
+LABEL num 2 2 12345
+FIELD entry 2 3 10 save
+BUTTON ok 2 5 "OK" save
+BUTTON later 9 5 "Later" save
+BUTTON edge 28 5 "Clip" save
+ON save PU
+DISABLE later

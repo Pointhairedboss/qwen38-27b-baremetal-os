@@ -1,0 +1,12 @@
+key ENTER
+key ENTER
+key TAB
+key SPACE
+frame
+click save
+click big
+click big
+state
+click dec
+action store
+frame

@@ -1,0 +1,3 @@
+; Malformed: a missing ']' (bootLogo crashes here; Glyph must not).
+REPEAT 4 [FD 10 RT 90
+FD 3

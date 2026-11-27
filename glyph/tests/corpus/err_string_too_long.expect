@@ -1,0 +1,3 @@
+glyph 0.1
+load: error E_STR_LEN 1:10 string longer than 63 characters
+end

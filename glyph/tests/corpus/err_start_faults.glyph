@@ -1,0 +1,8 @@
+; Runtime error during start faults the session; later inputs are refused
+; but the frame drawn so far is still rendered.
+SCREEN 10 3
+SET n 0
+ON go ADD n 1
+TEXT 0 0 "before"
+FD 1001
+TEXT 0 1 "after"

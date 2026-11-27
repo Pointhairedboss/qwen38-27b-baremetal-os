@@ -1,0 +1,15 @@
+; State + events: buttons change an integer, a label is bound to it,
+; ADD saturates, SET copies values between variables.
+SCREEN 30 5
+SET count 0
+SET saved 0
+LABEL show 1 0 :count
+LABEL keep 12 0 :saved
+BUTTON inc 1 2 "+1" up
+BUTTON dec 7 2 "-1" down
+BUTTON big 13 2 "big" huge
+BUTTON save 20 2 "save" store
+ON up ADD count 1
+ON down ADD count -1
+ON huge ADD count 999999999
+ON store SET saved :count

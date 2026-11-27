@@ -1,0 +1,50 @@
+Glyph — provenance and third-party notices
+==========================================
+
+Glyph is a new, clean implementation. No bootLogo source code is copied into
+it. Its LOGO control model (FD/BK/RT/LT, PU/PD, REPEAT with bracketed
+lists, TO ... END, CLEARSCREEN, SETCOLOR) and its draw-then-advance turtle
+stepping were taken from the behaviour and documentation of bootLogo:
+
+  nanochess/bootLogo — https://github.com/nanochess/bootLogo
+  inspected at commit e3ce458a6d4eb0c0f41e3fc0f1239e09864b9df0
+  (bootlogo.asm blob 0a0fc1b5, README.md blob b174f535, LICENSE blob fcbda331)
+
+The conformance test tests/corpus/logo_bootlogo_flower.glyph reproduces the
+example program from the bootLogo README. bootLogo's licence:
+
+  bootLogo - Small Logo language in a boot sector.
+  Copyright (c) 2024 Oscar Toledo G. http://nanochess.org/
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The bare-metal adapter (src/baremetal/) calls driver routines of this
+repository (02-baremetal-os/drivers.asm, 04-qwen38-27b-os/drivers.asm), which
+derive from alesha-pro/llm.asm under the MIT licence in ../LICENSE. No driver
+code is copied into Glyph.
+
+Glyph's own source sits in this repository. The repository owner has not yet
+chosen a licence for it separately from ../LICENSE.
+
+Design lineage: germination GM-CI-003 (Glyph track, experiment
+GM-CI-003-EXP-003) in Pointhairedboss/germinations,
+domains/computing-infrastructure/baremetal-pooled-inference/.

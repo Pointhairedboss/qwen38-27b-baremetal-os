@@ -1,0 +1,32 @@
+glyph 0.1
+load: ok nodes=11 names=8 components=4 state=1 procs=0 handlers=3
+main: ok steps=2 changed=LOCKED focus=A
+@ frame
+ 0|> A <[ Lock ]( Unlock )
+ 1|
+ 2|focus moves when a control is disabled
+@ key TAB -> ok focus=LOCK
+@ key TAB -> ok focus=A
+@ click lock -> ok action=DOLOCK steps=4 changed=LOCKED focus=-
+@ frame
+ 0|( A )( Lock )[ Unlock ]
+ 1|
+ 2|focus moves when a control is disabled
+@ click a -> ignored focus=-
+@ click info -> ignored focus=-
+@ click nobody -> ignored focus=-
+@ key TAB -> ok focus=UNLOCK
+@ frame
+ 0|( A )( Lock )> Unlock <
+ 1|
+ 2|focus moves when a control is disabled
+@ key ENTER -> ok action=DOUNLOCK steps=4 changed=LOCKED focus=A
+@ frame
+ 0|> A <[ Lock ]( Unlock )
+ 1|
+ 2|focus moves when a control is disabled
+@ key TAB -> ok focus=LOCK
+@ key TAB -> ok focus=A
+@ state
+  LOCKED = 0
+end

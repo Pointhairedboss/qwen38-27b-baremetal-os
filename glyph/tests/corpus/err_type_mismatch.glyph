@@ -1,0 +1,4 @@
+SCREEN 10 2
+SET word "abc"
+ON bad FD :word
+ON worse ADD word 1

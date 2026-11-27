@@ -1,0 +1,10 @@
+; drawing.glyph — text-cell drawing primitives and colours.
+SCREEN 40 12
+COLOR 15 1 RECT 0 0 40 12
+COLOR 14 1 BOX 1 1 38 10
+COLOR 11 1 TEXT 3 2 "LINE, RECT, BOX, TEXT"
+COLOR 10 1 LINE 3 4 20 4
+COLOR 12 1 LINE 3 5 7 9
+COLOR 13 1 LINE 20 5 16 9
+COLOR 0 4 RECT 24 4 12 5
+COLOR 15 4 TEXT 26 6 "a panel"

@@ -1,0 +1,22 @@
+glyph 0.1
+load: ok nodes=2 names=5 components=3 state=2 procs=0 handlers=1
+main: ok steps=1 changed=MSG focus=NAME
+@ type "Ada Lovelace" -> ok changed=NAME focus=NAME
+@ frame
+ 0|
+ 1| >Ada Love< Ada Love
+ 2|
+ 3| type a name
+@ key BS -> ok changed=NAME focus=NAME
+@ key DEL -> ok changed=NAME focus=NAME
+@ key 'x' -> ok changed=NAME focus=NAME
+@ key ENTER -> ok action=SUBMIT steps=1 changed=MSG focus=NAME
+@ frame
+ 0|
+ 1| >Ada Lox_< Ada Lox
+ 2|
+ 3| Ada Lox
+@ state
+  MSG = "Ada Lox"
+  NAME = "Ada Lox"
+end

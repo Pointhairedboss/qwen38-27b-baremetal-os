@@ -1,0 +1,5 @@
+; Unbracketed nested REPEAT (bootLogo form), REPEAT 0, aliases, angles.
+SCREEN 20 11
+REPEAT 3 REPEAT 2 FORWARD 1
+REPEAT 0 [FD 9]
+RIGHT 135 FD 3 LEFT 45 BACK 2 RT -450

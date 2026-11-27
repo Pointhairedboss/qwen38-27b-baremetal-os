@@ -1,0 +1,12 @@
+; form.glyph — fields, a submit button and a confirmation label.
+SCREEN 44 9
+SET status "fill in both fields"
+SET sent 0
+PANEL p 0 0 44 9 "Register"
+LABEL l1 2 2 "Name:"
+FIELD name 9 2 20 submit
+LABEL l2 2 4 "Node:"
+FIELD node 9 4 12 submit
+BUTTON go 9 6 "Submit" submit
+LABEL st 20 6 :status
+ON submit [SET status "submitted" ADD sent 1]

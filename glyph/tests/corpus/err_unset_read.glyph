@@ -1,0 +1,4 @@
+; A variable that is SET later is unset when first read.
+SCREEN 10 2
+TEXT 0 0 :late
+SET late 1

@@ -1,0 +1,8 @@
+; Field editing: printable keys, width limit, backspace, ENTER fires the
+; field action, a label bound to the field variable updates live.
+SCREEN 30 4
+SET msg "type a name"
+FIELD name 1 1 8 submit
+LABEL echo 12 1 :name
+LABEL status 1 3 :msg
+ON submit SET msg :name

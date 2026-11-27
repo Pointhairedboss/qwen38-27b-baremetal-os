@@ -1,0 +1,77 @@
+; demo.glyph — the interactive Glyph demonstration application.
+;
+;   glyph run examples/demo.glyph
+;
+; TAB moves focus, ENTER or SPACE presses a button, typing edits the name
+; field, ENTER in the field submits it, ESC quits.
+;
+; It exercises every v0.1 feature: layout (PANEL/LABEL/BUTTON/FIELD), state
+; (SET/ADD, labels bound to variables), events (ON handlers fired by controls),
+; ENABLE/DISABLE, and LOGO procedures redrawing turtle art in response to
+; input.
+
+SCREEN 64 20
+
+; ---- state ------------------------------------------------------------------
+SET count 0
+SET spins 0
+SET angle 0
+SET shown "stranger"
+SET mode "unlocked"
+
+; ---- layout ------------------------------------------------------------------
+PANEL frame 0 0 64 20 "Glyph v0.1 demo"
+
+PANEL ctr 2 2 28 6 "Counter"
+LABEL ctrlbl 4 3 "Value:"
+LABEL ctrval 11 3 :count
+BUTTON dec 4 5 "-" down
+BUTTON inc 10 5 "+" up
+BUTTON reset 16 5 "Reset" zero
+
+PANEL who 2 9 28 6 "Greeting"
+FIELD name 4 10 22 greet
+LABEL hi 4 12 "Hello,"
+LABEL hiname 11 12 :shown
+
+PANEL art 32 2 30 13 "Turtle"
+BUTTON spin 34 16 "Spin" turn
+LABEL spinlbl 44 16 "spins:"
+LABEL spinval 51 16 :spins
+
+BUTTON lock 4 16 "Lock" dolock
+BUTTON unlock 13 16 "Unlock" dounlock
+LABEL modelbl 24 16 :mode
+LABEL help 2 18 "TAB focus  ENTER/SPACE press  type in the field  ESC quit"
+
+; ---- turtle art ------------------------------------------------------------------
+TO petal REPEAT 3 [FD 4 RT 120] END
+TO emblem REPEAT 6 [petal RT 60] END
+; Home is (32,10). Move to the centre of the art panel, then draw at :angle.
+TO redraw
+  CLEARSCREEN
+  PU RT 90 FD 15 LT 90 FD 2 PD
+  RT :angle
+  COLOR 11 0 emblem COLOR 7 0
+END
+
+; ---- handlers ------------------------------------------------------------------
+ON up ADD count 1
+ON down ADD count -1
+ON zero SET count 0
+ON greet SET shown :name
+ON turn [ADD angle 15 ADD spins 1 redraw]
+ON dolock [
+  ENABLE unlock
+  DISABLE dec DISABLE inc DISABLE reset DISABLE name DISABLE spin DISABLE lock
+  SET mode "locked"
+]
+ON dounlock [
+  ENABLE dec ENABLE inc ENABLE reset ENABLE name ENABLE spin ENABLE lock
+  DISABLE unlock
+  SET mode "unlocked"
+]
+
+; ---- main --------------------------------------------------------------------
+DISABLE unlock
+redraw

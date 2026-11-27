@@ -1,0 +1,2 @@
+; Malformed: a non-ASCII byte outside any string.
+FD 1 → 2

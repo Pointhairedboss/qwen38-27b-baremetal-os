@@ -1,0 +1,22 @@
+glyph 0.1
+load: ok nodes=4 names=10 components=6 state=1 procs=0 handlers=3
+main: ok steps=1 changed=COUNT focus=DEC
+@ key TAB -> ok focus=INC
+@ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
+@ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
+@ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
+@ click dec -> ok action=DOWN steps=1 changed=COUNT focus=DEC
+@ frame
+ 0|+ Counter -----------------------+
+ 1||                                |
+ 2|| Count: 2                       |
+ 3||                                |
+ 4|| > -1 < [ +1 ] [ Reset ]        |
+ 5||                                |
+ 6|+--------------------------------+
+@ state
+  COUNT = 2
+@ click clr -> ok action=ZERO steps=1 changed=COUNT focus=CLR
+@ state
+  COUNT = 0
+end

@@ -1,0 +1,4 @@
+; Malformed: declarations are only allowed at the top level.
+TO make
+  BUTTON b 0 0 "b" go
+END

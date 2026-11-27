@@ -1,0 +1,15 @@
+glyph 0.1
+load: ok nodes=5 names=2 components=0 state=1 procs=0 handlers=1
+main: error steps=9 changed=N focus=-
+  ! E_RANGE 7:1 FD argument 1001 out of range -1000..1000
+@ action go -> error focus=-
+  ! E_FAULTED session faulted during start
+@ key TAB -> error focus=-
+  ! E_FAULTED session faulted during start
+@ frame
+ 0|before
+ 1|
+ 2|
+@ state
+  N = 0
+end

@@ -1,0 +1,4 @@
+; Unbounded recursion stops at call depth 16.
+SCREEN 10 2
+TO down FD 1 down END
+ON go down

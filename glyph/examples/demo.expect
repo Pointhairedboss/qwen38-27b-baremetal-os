@@ -1,0 +1,71 @@
+glyph 0.1
+load: ok nodes=47 names=34 components=19 state=6 procs=3 handlers=7
+main: ok steps=1466 changed=COUNT,SPINS,ANGLE,SHOWN,MODE focus=DEC
+@ key ENTER -> ok action=DOWN steps=1 changed=COUNT focus=DEC
+@ key TAB -> ok focus=INC
+@ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
+@ key SPACE -> ok action=UP steps=1 changed=COUNT focus=INC
+@ key SPACE -> ok action=UP steps=1 changed=COUNT focus=INC
+@ key TAB -> ok focus=RESET
+@ key TAB -> ok focus=NAME
+@ type "Ada" -> ok changed=NAME focus=NAME
+@ key ENTER -> ok action=GREET steps=1 changed=SHOWN focus=NAME
+@ key TAB -> ok focus=SPIN
+@ key ENTER -> ok action=TURN steps=1462 changed=SPINS,ANGLE focus=SPIN
+@ key ENTER -> ok action=TURN steps=1462 changed=SPINS,ANGLE focus=SPIN
+@ frame
+ 0|+ Glyph v0.1 demo ---------------------------------------------+
+ 1||                                                              |
+ 2|| + Counter -----------------+  + Turtle --------------------+ |
+ 3|| | Value: 2                 |  |                            | |
+ 4|| |                          |  |                            | |
+ 5|| | [ - ] [ + ] [ Reset ]    |  |            ******          | |
+ 6|| |                          |  |           * * * *          | |
+ 7|| +--------------------------+  |           *  **  *         | |
+ 8||                               |          *********         | |
+ 9|| + Greeting ----------------+  |           *  **  *         | |
+10|| | [Ada___________________] |  |           * * * *          | |
+11|| |                          |  |            ******          | |
+12|| | Hello, Ada               |  |                            | |
+13|| |                          |  |                            | |
+14|| +--------------------------+  +----------------------------+ |
+15||                                                              |
+16||   [ Lock ] ( Unlock ) unlocked  > Spin <  spins: 2           |
+17||                                                              |
+18|| TAB focus  ENTER/SPACE press  type in the field  ESC quit    |
+19|+--------------------------------------------------------------+
+@ key TAB -> ok focus=LOCK
+@ key ENTER -> ok action=DOLOCK steps=8 changed=MODE focus=UNLOCK
+@ frame
+ 0|+ Glyph v0.1 demo ---------------------------------------------+
+ 1||                                                              |
+ 2|| + Counter -----------------+  + Turtle --------------------+ |
+ 3|| | Value: 2                 |  |                            | |
+ 4|| |                          |  |                            | |
+ 5|| | ( - ) ( + ) ( Reset )    |  |            ******          | |
+ 6|| |                          |  |           * * * *          | |
+ 7|| +--------------------------+  |           *  **  *         | |
+ 8||                               |          *********         | |
+ 9|| + Greeting ----------------+  |           *  **  *         | |
+10|| | (Ada___________________) |  |           * * * *          | |
+11|| |                          |  |            ******          | |
+12|| | Hello, Ada               |  |                            | |
+13|| |                          |  |                            | |
+14|| +--------------------------+  +----------------------------+ |
+15||                                                              |
+16||   ( Lock ) > Unlock < locked    ( Spin )  spins: 2           |
+17||                                                              |
+18|| TAB focus  ENTER/SPACE press  type in the field  ESC quit    |
+19|+--------------------------------------------------------------+
+@ click inc -> ignored focus=UNLOCK
+@ key ENTER -> ok action=DOUNLOCK steps=8 changed=MODE focus=DEC
+@ key TAB -> ok focus=INC
+@ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
+@ state
+  COUNT = 3
+  SPINS = 2
+  ANGLE = 30
+  SHOWN = "Ada"
+  MODE = "unlocked"
+  NAME = "Ada"
+end

@@ -1,0 +1,3 @@
+glyph 0.1
+load: error E_TOPLEVEL 3:3 BUTTON is only allowed at the top level
+end

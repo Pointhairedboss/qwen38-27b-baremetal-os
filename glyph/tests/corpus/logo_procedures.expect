@@ -1,0 +1,15 @@
+glyph 0.1
+load: ok nodes=18 names=3 components=0 state=0 procs=3 handlers=0
+main: ok steps=128 focus=-
+@ turtle -> x=15 y=4 heading=0 pen=down
+@ frame
+ 0|
+ 1|   ****  ****  ****
+ 2|   *  *  *  *  *  *
+ 3|   *  *  *  *  *  *
+ 4|   **********  ****
+ 5|
+ 6|
+ 7|
+ 8|
+end

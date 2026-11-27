@@ -1,0 +1,8 @@
+; Malformed: a procedure may not reuse a built-in word (BOX is a drawing command).
+SCREEN 24 9
+TO side FD 3 RT 90 END
+TO box REPEAT 4 side END
+TO hop [PU RT 90 FD 6 LT 90 PD]
+END
+LT 90 FD 9 RT 90
+box hop box hop box

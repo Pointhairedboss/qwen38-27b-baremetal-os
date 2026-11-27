@@ -1,0 +1,4 @@
+; LOGO baseline: REPEAT with a bracketed list draws a closed square and
+; returns the turtle home facing north.
+SCREEN 12 9
+REPEAT 4 [FD 4 RT 90]

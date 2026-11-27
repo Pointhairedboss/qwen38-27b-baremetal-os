@@ -1,0 +1,5 @@
+; Execution budget: an empty nested loop is still charged per iteration,
+; so it stops at exactly 100000 steps instead of hanging.
+SCREEN 10 2
+ON spin REPEAT 10000 [REPEAT 10000 []]
+ON ok REPEAT 10000 PU

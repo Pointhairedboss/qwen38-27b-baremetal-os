@@ -1,0 +1,14 @@
+; The example program from the nanochess/bootLogo README (BSD-2-Clause,
+; (c) 2024 Oscar Toledo G.), one REPL line per source line. bootLogo matches
+; only two letters of a procedure name; Glyph uses whole names, which this
+; program already does. Output is a text-cell rendering, not CGA pixels.
+TO CURVE REPEAT 4 [LT 10 FD 10] END
+TO PETAL [CURVE LT 140 CURVE] END
+TO FLOWER REPEAT 4 [PETAL LT 50] END
+FLOWER
+RT 180
+FD 50
+RT 140
+PETAL
+PU
+FD 50

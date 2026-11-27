@@ -1,0 +1,28 @@
+glyph 0.1
+load: ok nodes=6 names=12 components=6 state=2 procs=0 handlers=4
+main: ok steps=2 changed=COUNT,SAVED focus=INC
+@ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
+@ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
+@ key TAB -> ok focus=DEC
+@ key SPACE -> ok action=DOWN steps=1 changed=COUNT focus=DEC
+@ frame
+ 0| 1          0
+ 1|
+ 2| [ +1 ]> -1 <[ big ][ save ]
+ 3|
+ 4|
+@ click save -> ok action=STORE steps=1 changed=SAVED focus=SAVE
+@ click big -> ok action=HUGE steps=1 changed=COUNT focus=BIG
+@ click big -> ok action=HUGE steps=1 focus=BIG
+@ state
+  COUNT = 999999999
+  SAVED = 1
+@ click dec -> ok action=DOWN steps=1 changed=COUNT focus=DEC
+@ action store -> ok action=STORE steps=1 changed=SAVED focus=DEC
+@ frame
+ 0| 999999998  999999998
+ 1|
+ 2| [ +1 ]> -1 <[ big ][ save ]
+ 3|
+ 4|
+end

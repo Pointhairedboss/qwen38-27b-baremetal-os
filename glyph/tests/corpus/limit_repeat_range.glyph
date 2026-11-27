@@ -1,0 +1,5 @@
+SCREEN 10 2
+SET n 10001
+ON big REPEAT :n PU
+ON neg REPEAT -1 PU
+ON far FD -1001

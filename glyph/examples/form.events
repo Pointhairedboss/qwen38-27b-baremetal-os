@@ -1,0 +1,7 @@
+type "Ada"
+key TAB
+type "p510-a"
+key TAB
+key ENTER
+frame
+state

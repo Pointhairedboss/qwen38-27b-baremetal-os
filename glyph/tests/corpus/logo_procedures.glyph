@@ -1,0 +1,8 @@
+; TO ... END procedures, a call before the definition, nesting and PU/PD.
+SCREEN 24 9
+TO side FD 3 RT 90 END
+TO square REPEAT 4 side END
+TO hop [PU RT 90 FD 6 LT 90 PD]
+END
+LT 90 FD 9 RT 90
+square hop square hop square

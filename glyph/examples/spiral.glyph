@@ -1,0 +1,7 @@
+; spiral.glyph — pure LOGO: procedures, nested REPEAT and turning.
+SCREEN 60 24
+TO side FD 3 RT 30 END
+TO ring REPEAT 12 side END
+TO wheel REPEAT 6 [ring RT 60]
+END
+wheel

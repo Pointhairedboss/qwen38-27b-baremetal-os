@@ -1,0 +1,7 @@
+; Named actions, unknown actions, a handler runtime error that keeps the
+; session alive (no rollback), and per-entry step counts.
+SCREEN 20 2
+SET n 0
+ON bump ADD n 1
+ON fail [ADD n 100 FD 5000]
+ON draw [REPEAT 3 [FD 1 RT 120]]

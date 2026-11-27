@@ -1,0 +1,3 @@
+; Malformed: a control names an action with no ON handler.
+BUTTON ok 0 0 "OK" confirm
+ON cancel PU

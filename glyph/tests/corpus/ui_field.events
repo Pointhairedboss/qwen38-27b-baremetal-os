@@ -1,0 +1,8 @@
+type "Ada Lovelace"
+frame
+key BS
+key DEL
+key 'x'
+key ENTER
+frame
+state

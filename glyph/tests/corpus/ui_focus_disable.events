@@ -1,0 +1,15 @@
+frame
+key TAB
+key TAB
+click lock
+frame
+click a
+click info
+click nobody
+key TAB
+frame
+key ENTER
+frame
+key TAB
+key TAB
+state

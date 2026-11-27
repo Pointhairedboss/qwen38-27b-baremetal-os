@@ -1,0 +1,3 @@
+glyph 0.1
+load: error E_CHAR 2:6 unexpected character 0xe2
+end

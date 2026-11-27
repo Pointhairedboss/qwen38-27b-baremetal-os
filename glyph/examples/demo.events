@@ -1,0 +1,22 @@
+# Scripted walk through demo.glyph (focus order: dec inc reset name spin lock unlock)
+key ENTER
+key TAB
+key ENTER
+key SPACE
+key SPACE
+key TAB
+key TAB
+type "Ada"
+key ENTER
+key TAB
+key ENTER
+key ENTER
+frame
+key TAB
+key ENTER
+frame
+click inc
+key ENTER
+key TAB
+key ENTER
+state

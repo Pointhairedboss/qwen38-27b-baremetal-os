@@ -1,0 +1,12 @@
+; Focus order, TAB wrapping, DISABLE of the focused control, ENABLE (which
+; never moves focus), clicks on disabled and non-control components.
+SCREEN 40 3
+SET locked 0
+BUTTON a 0 0 "A" pa
+BUTTON lock 5 0 "Lock" dolock
+BUTTON unlock 13 0 "Unlock" dounlock
+LABEL info 0 2 "focus moves when a control is disabled"
+ON pa PU
+ON dolock [DISABLE a DISABLE lock ENABLE unlock SET locked 1]
+ON dounlock [ENABLE a ENABLE lock DISABLE unlock SET locked 0]
+DISABLE unlock

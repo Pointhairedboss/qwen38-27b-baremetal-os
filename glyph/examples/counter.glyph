@@ -1,0 +1,12 @@
+; counter.glyph — buttons, a bound label and state.
+SCREEN 34 7
+SET count 0
+PANEL frame 0 0 34 7 "Counter"
+LABEL cap 2 2 "Count:"
+LABEL val 9 2 :count
+BUTTON dec 2 4 "-1" down
+BUTTON inc 9 4 "+1" up
+BUTTON clr 16 4 "Reset" zero
+ON up ADD count 1
+ON down ADD count -1
+ON zero SET count 0

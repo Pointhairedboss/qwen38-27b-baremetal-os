@@ -1,0 +1,3 @@
+; Malformed: unknown word in command position, reported at its position.
+FD 10
+  JUMP 5
