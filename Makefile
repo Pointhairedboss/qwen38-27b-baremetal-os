@@ -61,6 +61,11 @@ OS_OBJS := \
 	$(OS_BUILD)/tokenizer.o \
 	$(OS_BUILD)/transformer.o
 
+# Glyph language runtime (glyph/): one relocatable object, built by glyph/Makefile
+# with freestanding flags; kernel.asm's REPL hands /glyph lines to it.
+GLYPH_KOBJ := glyph/build/glyph-kernel.o
+OS_OBJS += $(GLYPH_KOBJ)
+
 # --- Phase 3: Pure x86-64 Mini-GPT Training & Inference Engine (32 KB ELF) ---
 P3_DIR       := 03-minigpt-train
 TRAIN_BUILD  := $(BUILD)/train
@@ -76,7 +81,7 @@ TRAIN_OBJS := \
 	$(TRAIN_BUILD)/tui.o \
 	$(TRAIN_BUILD)/main.o
 
-.PHONY: asm-qwen35 all inference test-math check os os-check os-iso os-run os27-bartest os27-bartest-run os27 os27-run os27-iso train train-check check-all clean
+.PHONY: FORCE asm-qwen35 all inference test-math check os os-check os-iso os-run os27-bartest os27-bartest-run os27 os27-run os27-iso train train-check check-all clean
 
 all: inference $(TEST) os train
 
@@ -136,6 +141,11 @@ $(OS_ELF64): $(OS_OBJS) $(P2_DIR)/linker.ld
 
 $(OS_ELF): $(OS_ELF64)
 	$(OBJCOPY) -O elf32-i386 $< $@
+
+$(GLYPH_KOBJ): FORCE
+	$(MAKE) -C glyph kernel-obj
+
+FORCE:
 
 os: $(OS_ELF)
 

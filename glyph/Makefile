@@ -37,7 +37,7 @@ FORK     := ..
 P2_DIR   := $(FORK)/02-baremetal-os
 P4_DIR   := $(FORK)/04-qwen38-27b-os
 
-.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean reference screenshots glyph-os qemu-run qemu-test vm-screenshots
+.PHONY: all test unit corpus sanitize valgrind fuzz freestanding baremetal-link kernel-link check-all clean reference screenshots glyph-os qemu-run qemu-test vm-screenshots kernel-obj
 
 all: $(BUILD)/glyph
 
@@ -103,14 +103,12 @@ freestanding: | $(BUILD)
 
 # 2. Core + bare-metal adapter link against the fork's own driver objects.
 #    Nothing in the fork is modified; its drivers.asm is assembled read-only.
-baremetal-link: freestanding
+baremetal-link: $(BUILD)/glyph-kernel.o
 	mkdir -p $(BUILD)/bm
-	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_bm.c -o $(BUILD)/bm/glyph_bm.o
-	nasm -f elf64 -DBARE_METAL -I$(FORK)/shared/ -I$(P2_DIR)/ src/baremetal/glyph_bm_entry.asm -o $(BUILD)/bm/glyph_bm_entry.o
 	for p in 02:$(P2_DIR) 04:$(P4_DIR); do \
 		tag=$${p%%:*}; dir=$${p#*:}; \
 		nasm -f elf64 -DBARE_METAL -DFAST_Q8=1 -I$(FORK)/shared/ -I$$dir/ $$dir/drivers.asm -o $(BUILD)/bm/drivers_$$tag.o || exit 1; \
-		ld -r -z noexecstack $(BUILD)/glyph_core.o $(BUILD)/bm/glyph_bm.o $(BUILD)/bm/glyph_bm_entry.o $(BUILD)/bm/drivers_$$tag.o \
+		ld -r -z noexecstack $(BUILD)/glyph-kernel.o $(BUILD)/bm/drivers_$$tag.o \
 			-o $(BUILD)/bm/glyph_phase$$tag.o || exit 1; \
 		echo "phase $$tag: unresolved after linking with drivers.asm (kernel provides these):"; \
 		nm -u $(BUILD)/bm/glyph_phase$$tag.o | tee $(BUILD)/bm/undefined_$$tag.txt; \
@@ -148,19 +146,35 @@ APP          ?= demo
 QEMU_SYSTEM  ?= qemu-system-x86_64 -machine pc -cpu max -m 256M -no-reboot
 QEMU_DISPLAY ?=
 
-$(GLYPH_OS): freestanding src/baremetal/glyph_os.c src/baremetal/glyph_bm.c tools/mkpayload.sh \
-             examples/*.glyph tests/corpus/*.glyph
+BM_SRC := src/baremetal/glyph_bm.c src/baremetal/glyph_apps.c src/baremetal/glyph_repl.c \
+          src/baremetal/glyph_os.c src/baremetal/glyph_apps.h src/baremetal/glyph_bm_entry.asm
+
+# Objects shared by both bare-metal builds: adapter, app table, programs.
+$(OSK)/apps.o: freestanding $(BM_SRC) tools/mkpayload.sh examples/*.glyph tests/corpus/*.glyph
 	mkdir -p $(OSK)
 	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_bm.c -o $(OSK)/glyph_bm.o
-	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_os.c -o $(OSK)/glyph_os.o
+	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_apps.c -o $(OSK)/glyph_apps.o
 	sh tools/mkpayload.sh $(OSK)/payload.asm
 	nasm -f elf64 $(OSK)/payload.asm -o $(OSK)/payload.o
+	ld -r -z noexecstack $(BUILD)/glyph_core.o $(OSK)/glyph_bm.o $(OSK)/glyph_apps.o $(OSK)/payload.o -o $@
+
+$(GLYPH_OS): $(OSK)/apps.o
+	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_os.c -o $(OSK)/glyph_os.o
 	for m in boot drivers runtime; do \
 		nasm -f elf64 -DBARE_METAL -DFAST_Q8=1 -I$(FORK)/shared/ -I$(P2_DIR)/ $(P2_DIR)/$$m.asm -o $(OSK)/$$m.o || exit 1; done
 	ld -m elf_x86_64 -T $(P2_DIR)/linker.ld --gc-sections -s -z max-page-size=0x1000 -z noexecstack \
-		$(OSK)/boot.o $(OSK)/drivers.o $(OSK)/runtime.o $(BUILD)/glyph_core.o \
-		$(OSK)/glyph_bm.o $(OSK)/glyph_os.o $(OSK)/payload.o -o $(GLYPH_OS).64
+		$(OSK)/boot.o $(OSK)/drivers.o $(OSK)/runtime.o $(OSK)/apps.o $(OSK)/glyph_os.o -o $(GLYPH_OS).64
 	objcopy -O elf32-i386 $(GLYPH_OS).64 $(GLYPH_OS)
+
+# One relocatable object for the inference kernel (root Makefile, OS_OBJS):
+# core, adapter, app table, programs, the /glyph REPL hook and its asm shims.
+GLYPH_KOBJ := $(BUILD)/glyph-kernel.o
+$(GLYPH_KOBJ): $(OSK)/apps.o
+	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_repl.c -o $(OSK)/glyph_repl.o
+	nasm -f elf64 src/baremetal/glyph_bm_entry.asm -o $(OSK)/glyph_bm_entry.o
+	ld -r -z noexecstack $(OSK)/apps.o $(OSK)/glyph_repl.o $(OSK)/glyph_bm_entry.o -o $@
+
+kernel-obj: $(GLYPH_KOBJ)
 
 glyph-os: $(GLYPH_OS)
 	ls -la $(GLYPH_OS)

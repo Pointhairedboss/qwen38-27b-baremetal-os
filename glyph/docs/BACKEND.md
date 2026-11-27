@@ -124,11 +124,26 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
 - Phase 4 has not been exercised beyond linking.
 - QEMU here is TCG emulation, so timing says nothing about real hardware.
 
-## 5. Integration into the inference kernel (proposed; not done)
+## 5. Integration into the inference kernel (implemented for Phase 2; end-to-end run pending)
 
-The standalone kernel above proves that the core, adapter and drivers work
-together on the real boot path. To run Glyph *alongside inference*, the smallest
-change adds four things to `02-baremetal-os/kernel.asm`. No driver, scheduler, SMP or inference code changes,
+**Status.** Implemented with the owner's go-ahead, and it builds and links: the
+root `make os` produces `build/asm-llm-os.elf` at 103 448 B, against 24 252 B for
+the pinned upstream kernel (`tests/kernel_link.sh`). At the `asm-llm>` prompt:
+
+- `/glyph` lists the built-in programs.
+- `/glyph NAME` runs one on VGA; ESC returns to the chat.
+- `/glyphtest` prints the conformance transcripts on COM1.
+
+`glyph/tests/qemu_inference_glyph.py` boots the kernel with a real Qwen3-0.6B
+model under QEMU and checks that answers are token-identical to the Linux build
+before and after a Glyph session. **That run has not completed yet; no result is
+claimed here.** Phase 4 is not integrated.
+
+The change, as implemented: the `kernel.asm` REPL hands every trimmed line to
+`glyph_shell_repl` (`src/baremetal/glyph_repl.c`) before its own `/commands`.
+Non-Glyph lines return 0 and are handled exactly as before. The original design
+notes follow; they described adding four things to
+`02-baremetal-os/kernel.asm`. No driver, scheduler, SMP or inference code changes,
 and no core is reserved.
 
 1. `extern glyph_shell_run`.

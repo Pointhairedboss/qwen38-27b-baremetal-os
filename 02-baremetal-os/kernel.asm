@@ -35,6 +35,7 @@ extern console_readline
 extern timer_init
 extern timer_ns
 extern qemu_shutdown
+extern glyph_shell_repl                 ; glyph/src/baremetal (Glyph language runtime)
 
 extern mem_init
 extern smp_init
@@ -265,6 +266,13 @@ kernel_main:
     jmp     .tt_lp
 
 .chk_cmd:
+    ; /glyph, /glyphtest: Glyph programs (glyph/src/baremetal/glyph_repl.c).
+    ; Returns eax=1 if the line was a Glyph command; other lines fall through.
+    mov     rdi, r12
+    call    glyph_shell_repl
+    test    eax, eax
+    jnz     .repl_loop
+
     ; /halt, /quit, exit
     mov     rdi, r12
     lea     rsi, [rel cmd_halt]
@@ -1306,7 +1314,7 @@ ban_mod_at:     db " MiB @ 0x", 0
 ban_mod_ctx:    db ", 28L, ctx=", 0
 
 msg_prompt_lbl: db "Prompt: ", 0
-msg_repl_help:  db "Interactive Bare-Metal Chat (/clear, /think, /nothink, /bench, /halt, /help)", 10, 0
+msg_repl_help:  db "Interactive Bare-Metal Chat (/clear, /think, /nothink, /bench, /glyph, /halt, /help)", 10, 0
 msg_repl_prompt: db 10, "asm-llm> ", 0
 msg_chat_cleared: db "[chat] history cleared (ctx=0/", 0
 msg_ctx_full:   db "[chat] context full, resetting KV-cache", 10, 0

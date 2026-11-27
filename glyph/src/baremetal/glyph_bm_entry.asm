@@ -9,6 +9,8 @@
 ;   int64 glyph_shell_run(const char *src  in rdi, uint64 len in rsi)
 ;   int64 glyph_shell_check(const char *src in rdi, uint64 len in rsi)
 ;   int64 glyph_shell_transcript(src rdi, len rsi, script rdx, script_len rcx)
+;   int64 glyph_shell_repl(const char *line in rdi)  -> 1 if the line was a
+;         /glyph command (handled), 0 otherwise (glyph_repl.c)
 ;
 ; Return: rax = 0 (GLYPH_OK) or a Glyph status code (sign-extended).
 ; ============================================================================
@@ -20,10 +22,12 @@ section .text
 extern glyph_bm_run
 extern glyph_bm_check
 extern glyph_bm_transcript
+extern glyph_repl_command
 
 global glyph_shell_run
 global glyph_shell_check
 global glyph_shell_transcript
+global glyph_shell_repl
 
 %macro ALIGNED_CALL 1
     push    rbp
@@ -45,3 +49,6 @@ glyph_shell_check:
 
 glyph_shell_transcript:
     ALIGNED_CALL glyph_bm_transcript
+
+glyph_shell_repl:
+    ALIGNED_CALL glyph_repl_command

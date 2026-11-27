@@ -1,20 +1,21 @@
 #!/bin/sh
-# kernel_link.sh — link the fork's Phase 2 and Phase 4 kernels, unmodified,
-# with and without the Glyph objects, using the fork's own NASM flags,
-# linker scripts and ld flags (copied from the root Makefile at 6c43dec).
+# kernel_link.sh — link the fork's Phase 2 and Phase 4 kernels with and
+# without the Glyph objects, using the fork's own NASM flags, linker scripts
+# and ld flags (copied from the root Makefile at 6c43dec).
 #
-# Nothing in the fork is changed and no call site is added: the Glyph entry
-# points are kept with `ld -u`, so this proves that the core + adapter link
-# into the real kernel image (symbols, relocations, sections, Multiboot
-# header placement). It does NOT boot anything.
+# Phase 2: the baseline is kernel.asm as pinned upstream (6c43dec, read from
+# git); "glyph" is the current kernel.asm, whose REPL calls glyph_shell_repl.
+# Phase 4: kernel.asm is unchanged; the Glyph entry points are kept with
+# `ld -u`. This checks symbols, relocations, sections and the Multiboot
+# header. It does NOT boot anything (see qemu_inference_glyph.py for that).
 #
 # usage: tests/kernel_link.sh BUILD_DIR FORK_DIR
 set -eu
 B=${1:?build dir}; F=${2:?fork dir}
 O="$B/kernel"
 mkdir -p "$O/p2" "$O/p4"
-KEEP="-u glyph_shell_run -u glyph_shell_check -u glyph_shell_transcript"
-GLYPH="$B/glyph_core.o $B/bm/glyph_bm.o $B/bm/glyph_bm_entry.o"
+KEEP="-u glyph_shell_run -u glyph_shell_check -u glyph_shell_transcript -u glyph_shell_repl"
+GLYPH="$B/glyph-kernel.o"
 
 asm() { nasm "$@"; }
 
@@ -22,10 +23,14 @@ asm() { nasm "$@"; }
 A2="-f elf64 -DBARE_METAL -DFAST_Q8=1 -I$F/shared/ -I$F/02-baremetal-os/"
 for m in boot drivers runtime smp kernel; do asm $A2 "$F/02-baremetal-os/$m.asm" -o "$O/p2/$m.o"; done
 for m in math matmul tokenizer transformer; do asm $A2 "$F/shared/$m.asm" -o "$O/p2/$m.o"; done
-P2OBJS="$O/p2/boot.o $O/p2/drivers.o $O/p2/runtime.o $O/p2/smp.o $O/p2/kernel.o $O/p2/math.o $O/p2/matmul.o $O/p2/tokenizer.o $O/p2/transformer.o"
+git -C "$F" show 6c43dec:02-baremetal-os/kernel.asm > "$O/p2/kernel_base.asm"
+asm $A2 "$O/p2/kernel_base.asm" -o "$O/p2/kernel_base.o"
+# Same object order as the root Makefile's OS_OBJS (order changes padding).
+P2A="$O/p2/boot.o $O/p2/drivers.o $O/p2/runtime.o $O/p2/smp.o"
+P2B="$O/p2/math.o $O/p2/matmul.o $O/p2/tokenizer.o $O/p2/transformer.o"
 L2="-m elf_x86_64 -T $F/02-baremetal-os/linker.ld --gc-sections -s -z max-page-size=0x1000 -z noexecstack"
-ld $L2 $P2OBJS -o "$O/p2-base.elf64"
-ld $L2 $KEEP $P2OBJS $GLYPH -o "$O/p2-glyph.elf64"
+ld $L2 $P2A "$O/p2/kernel_base.o" $P2B -o "$O/p2-base.elf64"
+ld $L2 $P2A "$O/p2/kernel.o" $P2B $GLYPH -o "$O/p2-glyph.elf64"
 
 # ---- Phase 4 (04-qwen38-27b-os) ---------------------------------------------
 A4="-f elf64 -DBARE_METAL -DFAST_Q8=1 -DQ8_MAX_K=32768 -I$F/shared/ -I$F/04-qwen38-27b-os/"
