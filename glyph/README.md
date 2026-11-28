@@ -159,8 +159,24 @@ for a fix, at most twice. Then the program runs on VGA until ESC. The kernel sid
 is one function, `glyph_generate`, that sets up a turn the way `/bench` does.
 docs/DRAW.md has the details, the prompt, and how it was chosen.
 
-The end-to-end QEMU check with the real model (`tests/qemu_draw.py`) is running;
-its results will be recorded here.
+Recorded under QEMU with the real Qwen3-0.6B: typing the request, the reply
+streaming as the model decodes, the drawing, then ESC:
+
+![/draw a hexagon: the model writes REPEAT 6 [FD 10 RT 60] and Glyph draws it](docs/screenshots/inference-draw.gif)
+
+`tests/qemu_draw.py` passes all 7 checks on the final kernel:
+- The prompt and the 18 generated tokens are identical to the Linux build.
+- The kernel draws the program the Linux extraction gives, on the first attempt.
+- The next question is still answered identically ("Paris").
+
+One `/draw` takes about 9 minutes under TCG. The 0.6B model writes valid Glyph
+reliably, but gets the shape right only for simple polygons (docs/DRAW.md).
+
+```sh
+python3 -I glyph/tests/qemu_draw.py models/qwen3-0.6b-q8_0.asmbin "a hexagon"
+python3 -I glyph/tools/qemu_showcase.py --draw "a hexagon" models/qwen3-0.6b-q8_0.asmbin
+python3 -I glyph/tools/draw_eval.py "a star" "a house"     # score the prompt on Linux
+```
 
 Not yet done: a run on P510 hardware, the fork's full `scripts/verify_os.py`
 parity suite (it needs KVM), and the Phase 4 kernel (`docs/BACKEND.md` §4–5).

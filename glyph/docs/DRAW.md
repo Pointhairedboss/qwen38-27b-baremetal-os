@@ -16,6 +16,8 @@ REPEAT 6 [FD 10 RT 60]
 asm-llm>
 ```
 
+![/draw a hexagon under QEMU: request, the reply streaming, the drawing, ESC](screenshots/inference-draw.gif)
+
 The model's reply streams to the screen as it decodes, like any answer. Glyph
 then pulls the program out of the reply, checks it, and runs it under the step
 budget. ESC returns to the chat.
