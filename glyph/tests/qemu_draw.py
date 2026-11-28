@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory() as tmp:
     k.send("/draw")
     m = k.wait_for(r"\[draw\] usage: /draw WHAT.*?asm-llm> ", pos, 120)
     check("/draw with no request prints the usage and generates nothing",
-          "PROMPT_TOKENS" not in k.text()[pos:m.end()])
+          "PROMPT_TOKENS" not in k.text()[pos:m.end()] and "new chat" not in k.text()[pos:m.end()])
     pos = m.end()
 
     k.send("/draw " + REQUEST)

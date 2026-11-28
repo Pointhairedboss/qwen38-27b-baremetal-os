@@ -57,7 +57,8 @@ static int draw(const char *request)
     ops.user = 0;
     ops.primer = glyph_draw_primer;
     ops.repair = glyph_draw_repair;
-    glyph_draw(&ops, &g_draw_vm, request);
+    /* GLYPH_E_ARG: a usage error, nothing was generated and the chat is intact */
+    if (glyph_draw(&ops, &g_draw_vm, request) == GLYPH_E_ARG) return 1;
     glyph_apps_out("[draw] back to asm-llm (new chat)\n");
     return 1;
 }

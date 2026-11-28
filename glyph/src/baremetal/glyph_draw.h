@@ -37,8 +37,9 @@ typedef struct glyph_draw_ops {
     const char *repair;
 } glyph_draw_ops;
 
-/* Returns GLYPH_OK when a program was drawn, else the last error code
- * (GLYPH_E_ARG for an empty or too long request). */
+/* Returns GLYPH_OK when a program was drawn, else the last error code.
+ * GLYPH_E_ARG (an empty or too long request, or a template that does not fit)
+ * means nothing was generated. */
 int glyph_draw(const glyph_draw_ops *ops, glyph_vm *scratch, const char *request);
 
 /* Fill {REQUEST}, {PROGRAM}, {ERROR} in tmpl into out (cap bytes). Values are
