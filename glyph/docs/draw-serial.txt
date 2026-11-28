@@ -4,22 +4,21 @@
 ==============================================================================
   CPU   : QEMU TCG CPU version 2.5+ (AVX2+FMA, 2104 MHz)
   SMP   : 4/4 x86-64 cores online (APIC INIT-SIPI-SIPI, lock-free)
-  RAM   : 2047 MiB | Arena: 449 MiB | Boot: 248.79 ms
+  RAM   : 2047 MiB | Arena: 449 MiB | Boot: 239.14 ms
   Model : Qwen3-0.6B Q8_0 (614 MiB @ 0x0036D000, 28L, ctx=2048)
 ==============================================================================
 Interactive Bare-Metal Chat (/clear, /think, /nothink, /bench, /glyph, /draw, /halt, /help)
 
 asm-llm> /draw
 [draw] usage: /draw WHAT, e.g. /draw a star
-[draw] back to asm-llm (new chat)
 
 asm-llm> /draw a hexagon
 [draw] asking the model for a Glyph program
 PROMPT_TOKENS:151644,872,198,82039,374,8081,46,389,264,1467,4171,13,25311,510,64,9334,25,3596,47017,220,19,508,14596,220,21,10635,220,24,15,921,64,21495,25,3596,47017,220,18,508,14596,220,23,10635,220,16,17,15,921,64,12671,25,3596,47017,220,18,21,508,14596,220,16,10635,220,16,15,921,64,12371,6113,25,151645,198,151644,77091,198,151667,271,151668,271
 a hexagon: REPEAT 6 [FD 10 RT 60]
 GEN_TOKENS:64,12371,6113,25,3596,47017,220,21,508,14596,220,16,15,10635,220,21,15,60
-[asm-llm-os] prefill: 77 tok in 598812.07 ms (0.13 tok/s)
-[asm-llm-os] decode : 18 tok in 255137.45 ms (0.07 tok/s, cores=4) ctx=95/2048
+[asm-llm-os] prefill: 77 tok in 392551.67 ms (0.20 tok/s)
+[asm-llm-os] decode : 18 tok in 129979.66 ms (0.13 tok/s, cores=4) ctx=95/2048
 [draw] drawing it (ESC returns)
 [draw] program:
 REPEAT 6 [FD 10 RT 60]
@@ -30,7 +29,7 @@ asm-llm> What is the capital of France? Answer in one word.
 PROMPT_TOKENS:151644,872,198,3838,374,279,6722,315,9625,30,21806,304,825,3409,13,151645,198,151644,77091,198,151667,271,151668,271
 Paris
 GEN_TOKENS:59604
-[asm-llm-os] prefill: 24 tok in 249666.25 ms (0.10 tok/s)
-[asm-llm-os] decode : 1 tok in 13570.09 ms (0.07 tok/s, cores=4) ctx=27/2048
+[asm-llm-os] prefill: 24 tok in 132207.60 ms (0.18 tok/s)
+[asm-llm-os] decode : 1 tok in 6730.83 ms (0.15 tok/s, cores=4) ctx=27/2048
 
 asm-llm> 
