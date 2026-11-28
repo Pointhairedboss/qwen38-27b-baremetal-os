@@ -1,0 +1,894 @@
+tools/draw_eval.py, 2026-11-28: the /draw loop on build/asm-llm (Linux, token-identical to the
+kernel), Qwen3-0.6B Q8_0, greedy, 64 tokens per reply, up to 2 repairs, final glyph_extract.
+Each request: the programs, the model's first reply, and the drawn cells (rows with ink).
+
+Prompts compared ({REQUEST} is replaced by the request):
+
+--- H-labelled-circle-last
+Glyph is LOGO on a text screen. Examples:
+a square: REPEAT 4 [FD 6 RT 90]
+a triangle: REPEAT 3 [FD 8 RT 120]
+a circle: REPEAT 36 [FD 1 RT 10]
+{REQUEST}:
+
+--- H2-labelled-star
+Glyph is LOGO on a text screen. Examples:
+a square: REPEAT 4 [FD 6 RT 90]
+a star: REPEAT 5 [FD 10 RT 144]
+a circle: REPEAT 36 [FD 1 RT 10]
+{REQUEST}:
+
+--- H3-labelled-steps
+Glyph is LOGO on a text screen. Examples:
+a square: REPEAT 4 [FD 6 RT 90]
+a triangle: REPEAT 3 [FD 8 RT 120]
+steps: REPEAT 4 [FD 2 RT 90 FD 2 LT 90]
+a circle: REPEAT 36 [FD 1 RT 10]
+{REQUEST}:
+
+--- B-named-steps-last
+Glyph is LOGO on a text screen. Examples:
+square: REPEAT 4 [FD 6 RT 90]
+triangle: REPEAT 3 [FD 8 RT 120]
+steps: REPEAT 3 [FD 2 RT 90 FD 3 LT 90]
+Write only the Glyph program for {REQUEST}.
+
+--- F-named-line-last
+Glyph is LOGO on a text screen. Examples:
+square: REPEAT 4 [FD 6 RT 90]
+star: REPEAT 5 [FD 10 RT 144]
+line: FD 8
+Write only the Glyph program for {REQUEST}.
+
+--- C-rule
+Glyph is LOGO on an 80x24 text screen. A shape with N sides is REPEAT N [FD 6 RT 360/N].
+Example, a square: REPEAT 4 [FD 6 RT 90]
+Write only the Glyph program for {REQUEST}.
+
+--- G-instructions
+Write a LOGO program using only FD, BK, RT, LT, PU, PD and REPEAT n [ ]. Example, a square: REPEAT 4 [FD 6 RT 90]
+Draw {REQUEST}. Output only the program.
+
+Results:
+
+=== primer H-labelled-circle-last
+OK  tries=1 ink= 49  'a hexagon'                      REPEAT 6 [FD 10 RT 60]
+    model: 'a hexagon: REPEAT 6 [FD 10 RT 60]'
+                                               **        **
+                                              **           **
+                                            **              **
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                             **             *
+OK  tries=1 ink= 44  'a pentagon'                     REPEAT 5 [FD 10 RT 72]
+    model: "Sure! Here's a similar example for a **pentagon**:\n\n**a pentagon: REPEAT 5 [FD 10 RT 72]**  \n\nThis creates a regular pentagon with 5 sides, each of length 10 units, and each internal angle of 108
+                                                 **** *
+                                              ***      *
+                                            **          *
+                                            *           *
+                                            *            *
+                                            *             *
+                                            *              *
+                                            *              *
+                                            *              *
+                                            *             *
+                                            *            *
+                                            *           *
+                                            **          *
+                                              ***      *
+OK  tries=1 ink= 15  'an octagon'                     REPEAT 4 [FD 10 RT 45]
+    model: 'An octagon can be drawn using the following code:\n\n**a octagon: REPEAT 4 [FD 10 RT 45]**\n\nThis pattern repeats 4 times, with each "FD 10 RT 45" forming a side and a 45-degree angle.'
+                                              *                   *
+                                             *                     *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 44  'a star'                         REPEAT 5 [FD 10 RT 72]
+    model: 'a star: REPEAT 5 [FD 10 RT 72]'
+                                                 **** *
+                                              ***      *
+                                            **          *
+                                            *           *
+                                            *            *
+                                            *             *
+                                            *              *
+                                            *              *
+                                            *              *
+                                            *             *
+                                            *            *
+                                            *           *
+                                            **          *
+                                              ***      *
+OK  tries=1 ink= 29  'a house'                        REPEAT 5 [FD 10 RT 120]
+    model: 'a house: REPEAT 5 [FD 10 RT 120]'
+                                            *
+                                            ***
+                                            *  *
+                                            *   **
+                                            *     **
+                                            *       **
+                                            *      **
+                                            *    **
+                                            *  **
+                                            * **
+                                            **
+OK  tries=1 ink=  3  'the letter L'                   REPEAT 3 [FD 1 RT 100]
+    model: 'The correct answer is:  \n**REPEAT 3 [FD 1 RT 100]**  \n\nThis matches the pattern of the letter **L** on a text screen.'
+                                            **
+                                            *
+OK  tries=1 ink=  2  'a plus sign'                    REPEAT 2 [FD 1 RT 60]
+    model: 'a plus sign: REPEAT 2 [FD 1 RT 60]'
+                                            *
+                                            *
+OK  tries=1 ink= 13  'a staircase'                    REPEAT 5 [FD 10 RT 15]
+    model: "Sure! Here's a similar example for a **staircase**:\n\n**a staircase: REPEAT 5 [FD 10 RT 15]**\n\nThis creates a staircase with 5 repetitions, each time moving forward 10 units and turning 15 degrees
+                                             *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink=  3  'a zigzag'                       REPEAT 5 [FD 2 RT 180]
+    model: 'a zigzag: REPEAT 5 [FD 2 RT 180]'
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 49  'a spiral'                       REPEAT 10 [FD 10 RT 60]
+    model: "Sure! Here's an example of how to create a **spiral** using the `FD` and `RT` commands:\n\n**Example:**\n\n```lisp\nREPEAT 10 [FD 10 RT 60]\n```\n\nThis creates a spiral with a radius of 10 and a"
+                                               **        **
+                                              **           **
+                                            **              **
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                            *                *
+                                             **             *
+OK  tries=1 ink= 29  'a big triangle'                 REPEAT 10 [FD 10 RT 120]
+    model: 'To create a **big triangle** using the **LOGO** programming language, you can use the following code:\n\n```lisp\nREPEAT 10 [FD 10 RT 120]\n```\n\n### Explanation:\n- `REPEAT 10` – repeats the sequen
+                                            *
+                                            ***
+                                            *  *
+                                            *   **
+                                            *     **
+                                            *       **
+                                            *      **
+                                            *    **
+                                            *  **
+                                            * **
+                                            **
+OK  tries=1 ink= 20  'a small square'                 REPEAT 2 [FD 10 RT 90]
+    model: 'To create a **small square** on a text screen, you can use the following pattern:\n\n```lisp\nREPEAT 2 [FD 10 RT 90]\n```\n\nThis will draw a small square centered at the screen.'
+                                            **********
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+12/12 drew something (12 on the first try)
+=== primer H2-labelled-star
+OK  tries=1 ink=  3  'a hexagon'                      REPEAT 10 [FD 1 RT 120]
+    model: 'Sure! Here\'s a correct example of how to write a **glyph** like "LOGO" on a text screen:\n\n**a hexagon: REPEAT 10 [FD 1 RT 120]**  \n**Explanation:**  \n- A hexagon is made by moving forward 1 unit
+                                            *
+                                            **
+OK  tries=1 ink=  4  'a pentagon'                     REPEAT 10 [FD 1 RT 144]
+    model: 'Sure! Here\'s a correct example of how to write a **glyph** like "LOGO" on a text screen:\n\n**a pentagon: REPEAT 10 [FD 1 RT 144]**  \n\nThis creates a regular pentagon with a radius of 1 and a cent
+                                            **
+                                            **
+OK  tries=1 ink= 54  'an octagon'                     REPEAT 10 [FD 10 RT 135]
+    model: 'An octagon can be created using the following code:\n\n**a octagon: REPEAT 10 [FD 10 RT 135]**  \n\nThis creates an octagon with 10 iterations, each time moving 10 units forward and turning 135 degre
+                                            *   *
+                                            ** **
+                                            * * *
+                                         ***********
+                                          * **  * *
+                                           **   **
+                                          * **  * *
+                                         ***********
+                                            * * *
+                                            ** **
+                                            *   *
+OK  tries=1 ink= 24  'a star'                         REPEAT 4 [FD 6 RT 90]
+    model: "Here's the correct code for the **LOGO** (which is a type of **glyph**) on a text screen:\n\n### Example:\n- **a square**:  \n  `REPEAT 4 [FD 6 RT 90]`\n\n- **a star**:  \n  `REPEAT 5 [FD"
+                                            *******
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *******
+OK  tries=1 ink= 44  'a house'                        REPEAT 10 [FD 10 RT 144]
+    model: 'a house: REPEAT 10 [FD 10 RT 144]'
+                                            *
+                                            **
+                                            ***  **
+                                            ******
+                                          ***  ***
+                                        **  *   *
+                                          ***  ***
+                                            ******
+                                            ***  **
+                                            **
+                                            *
+OK  tries=1 ink= 24  'the letter L'                   REPEAT 4 [FD 6 RT 90]
+    model: 'The correct answer is:  \n**REPEAT 4 [FD 6 RT 90]**  \n\nThis matches the example for a square.'
+                                            *******
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *******
+OK  tries=1 ink=  4  'a plus sign'                    REPEAT 5 [FD 1 RT 144]
+    model: 'a plus sign: REPEAT 5 [FD 1 RT 144]'
+                                            **
+                                            **
+OK  tries=1 ink=  9  'a staircase'                    REPEAT 10 [FD 1 RT 10]
+    model: "Sure! Here's a similar example for a **staircase**:\n\n**a staircase: REPEAT 10 [FD 1 RT 10]**\n\nThis creates a staircase with 10 steps, each 1 unit in length and 10 degrees upward."
+                                               ***
+                                              *
+                                             *
+                                             *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink=  4  'a zigzag'                       REPEAT 10 [FD 1 RT 90]
+    model: "Sure! Here's a similar example for a **zigzag**:\n\n**a zigzag: REPEAT 10 [FD 1 RT 90]**  \n\nThis creates a zigzag pattern by moving forward 1 unit and turning 90 degrees at each step."
+                                            **
+                                            **
+OK  tries=2 ink= 30  'a spiral'                       REPEAT 4 [FD 6 RT 90] | REPEAT 5 [FD 10 RT 14]
+    model: 'Here are some examples of how to create the described shapes using the **FD** and **RT** commands:\n\n### a square:\n```plaintext\nREPEAT 4 [FD 6 RT 90]\n```\n\n### a star:\n```plaintext\nREPEAT 5 [F
+    last:  'The corrected program is:\n\nREPEAT 4 [FD 6 RT 90]\nREPEAT 5 [FD 10 RT 14]'
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *******
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *******
+OK  tries=1 ink= 29  'a big triangle'                 REPEAT 10 [FD 10 RT 120]
+    model: "Sure! Here's a similar example for a **big triangle**:\n\n**a big triangle: REPEAT 10 [FD 10 RT 120]**  \n\nThis creates a large triangle with a base of 10 units and a 120-degree angle at each vertex
+                                            *
+                                            ***
+                                            *  *
+                                            *   **
+                                            *     **
+                                            *       **
+                                            *      **
+                                            *    **
+                                            *  **
+                                            * **
+                                            **
+OK  tries=1 ink= 20  'a small square'                 REPEAT 2 [FD 10 RT 90]
+    model: "Sure! Here's a similar example for a **small square**:\n\n**a small square: REPEAT 2 [FD 10 RT 90]**  \n\nThis creates a small square rotated 90 degrees each time."
+                                            **********
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+12/12 drew something (11 on the first try)
+=== primer H3-labelled-steps
+OK  tries=1 ink= 36  'a hexagon'                      REPEAT 4 [FD 6 RT 90] | REPEAT 3 [FD 8 RT 120]
+    model: 'Here are the correct commands for each of the examples:\n\n- **a square**: `REPEAT 4 [FD 6 RT 90]`  \n- **a triangle**: `REPEAT 3 [FD 8 RT 120]`  \n- **steps**: `REPEAT 4 ['
+                                            *
+                                            ***
+                                            *******
+                                            *   ***
+                                            *     **
+                                            *    **
+                                            *  ** *
+                                            * **  *
+                                            *******
+OK  tries=1 ink= 16  'a pentagon'                     REPEAT 4 [FD 2 RT 90 FD 2 LT 90]
+    model: "Here's the correct answer for the pattern:\n\n**a pentagon: REPEAT 4 [FD 2 RT 90 FD 2 LT 90]**  \n\nThis matches the example given."
+                                                  **
+                                                  *
+                                                ***
+                                                *
+                                              ***
+                                              *
+                                            ***
+                                            *
+                                            *
+OK  tries=1 ink= 34  'an octagon'                     REPEAT 36 [FD 1 RT 10]
+    model: "Sure! Here's a correct and well-formed example of a command for a **glyph** that is **LOGO** on a text screen:\n\n**a circle: REPEAT 36 [FD 1 RT 10]**\n\n### Explanation:\n- `FD 1` moves the turtle f
+                                               ******
+                                              *      **
+                                             *        *
+                                             *         *
+                                            *          *
+                                            *          *
+                                            *          *
+                                            *          *
+                                             *         *
+                                             *        *
+                                              *      **
+                                               ******
+OK  tries=1 ink= 19  'a star'                         REPEAT 5 [FD 10 RT 72 FD 10 LT 72]
+    model: "Sure! Here's a similar example for a **star**:\n\n**a star: REPEAT 5 [FD 10 RT 72 FD 10 LT 72]**  \n\nThis creates a 5-pointed star. Let me know if you'd like another example!"
+                                                 ****
+                                              ***
+                                            **
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 23  'a house'                        REPEAT 4 [FD 10 RT 90 FD 10 LT 90]
+    model: "Sure! Here's a similar example for a **house**:\n\n**a house: REPEAT 4 [FD 10 RT 90 FD 10 LT 90]**  \n\nThis creates a simple house shape. Let me know if you'd like more variations!"
+                                                      *
+                                                      *
+                                            ***********
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink=  4  'the letter L'                   REPEAT 4 [FD 1 RT 10]
+    model: 'The correct answer is:  \n**REPEAT 4 [FD 1 RT 10]**  \n\nThis matches the pattern for the letter **L**.'
+                                             *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink=  8  'a plus sign'                    REPEAT 4 [FD 1 LT 90 FD 1 RT 90]
+    model: 'a plus sign: REPEAT 4 [FD 1 LT 90 FD 1 RT 90]'
+                                         *
+                                         **
+                                          **
+                                           **
+                                            *
+OK  tries=1 ink= 34  'a staircase'                    REPEAT 36 [FD 1 RT 10]
+    model: 'Here\'s the correct answer for the glyph "LOGO" on a text screen:\n\n**a circle: REPEAT 36 [FD 1 RT 10]**  \n\nThis matches the pattern of a circle, which is a common LOGO shape.'
+                                               ******
+                                              *      **
+                                             *        *
+                                             *         *
+                                            *          *
+                                            *          *
+                                            *          *
+                                            *          *
+                                             *         *
+                                             *        *
+                                              *      **
+                                               ******
+OK  tries=1 ink= 16  'a zigzag'                       REPEAT 4 [FD 2 RT 90 FD 2 LT 90]
+    model: "Sure! Here's a correct and well-formed example of a command sequence for a **glyph that is LOGO on a text screen**:\n\n**a zigzag: REPEAT 4 [FD 2 RT 90 FD 2 LT 90]**\n\n### Explanation:\n- `FD 2` mov
+                                                  **
+                                                  *
+                                                ***
+                                                *
+                                              ***
+                                              *
+                                            ***
+                                            *
+                                            *
+OK  tries=1 ink= 36  'a spiral'                       REPEAT 4 [FD 6 RT 90] | REPEAT 3 [FD 8 RT 120]
+    model: 'Here are the correct commands for each of the examples:\n\n- **a square**: `REPEAT 4 [FD 6 RT 90]`  \n- **a triangle**: `REPEAT 3 [FD 8 RT 120]`  \n- **steps**: `REPEAT 4 ['
+                                            *
+                                            ***
+                                            *******
+                                            *   ***
+                                            *     **
+                                            *    **
+                                            *  ** *
+                                            * **  *
+                                            *******
+OK  tries=1 ink= 16  'a big triangle'                 REPEAT 4 [FD 2 RT 90 FD 2 LT 90]
+    model: "Sure! Here's a similar example for a **big triangle**:\n\n**a big triangle: REPEAT 4 [FD 2 RT 90 FD 2 LT 90]**  \n\nThis creates a large triangle by repeating the pattern of moving forward 2 units an
+                                                  **
+                                                  *
+                                                ***
+                                                *
+                                              ***
+                                              *
+                                            ***
+                                            *
+                                            *
+OK  tries=1 ink=  2  'a small square'                 REPEAT 2 [FD 1 RT 90]
+    model: "Sure! Here's the correct answer based on the examples you provided:\n\n**a small square: REPEAT 2 [FD 1 RT 90]**  \n\nExplanation:  \n- A small square is a 2x2 square.  \n- To draw it, you move forwa
+                                            *
+                                            *
+12/12 drew something (12 on the first try)
+=== primer B-named-steps-last
+OK  tries=1 ink= 96  'a hexagon'                      REPEAT 6 [FD 6 RT 90 FD 6 LT 90 FD 6 RT 90 FD 6 LT 90 FD 6 RT 90]
+    model: 'REPEAT 6 [FD 6 RT 90 FD 6 LT 90 FD 6 RT 90 FD 6 LT 90 FD 6 RT 90]'
+                                                  *******     *******
+                                                  *                 *
+                                                  *                 *
+                                                  *                 *
+                                                  *                 *
+                                                  *                 *
+                                            *******                 *******
+                                            *                             *
+                                            *                             *
+                                            *                             *
+                                            *                             *
+                                            *                             *
+                                            *******                 *******
+                                                  *                 *
+OK  tries=1 ink= 19  'a pentagon'                     REPEAT 5 [FD 10 RT 72 FD 10 LT 72]
+    model: 'REPEAT 5 [FD 10 RT 72 FD 10 LT 72]'
+                                                 ****
+                                              ***
+                                            **
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 23  'an octagon'                     REPEAT 8 [FD 10 RT 90 FD 10 LT 90]
+    model: 'REPEAT 8 [FD 10 RT 90 FD 10 LT 90]'
+                                                      *
+                                                      *
+                                            ***********
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 16  'a star'                         REPEAT 5 [FD 10 RT 60 FD 10 LT 60]
+    model: 'REPEAT 5 [FD 10 RT 60 FD 10 LT 60]'
+                                               **
+                                              **
+                                            **
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 23  'a house'                        REPEAT 5 [FD 10 RT 90 FD 10 LT 90]
+    model: 'REPEAT 5 [FD 10 RT 90 FD 10 LT 90]'
+                                                      *
+                                                      *
+                                            ***********
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 19  'the letter L'                   REPEAT 3 [FD 6 RT 90 FD 3 LT 90]
+    model: 'REPEAT 3 [FD 6 RT 90 FD 3 LT 90]'
+                                               ****
+                                               *
+                                               *
+                                               *
+                                               *
+                                               *
+                                            ****
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink=  4  'a plus sign'                    REPEAT 2 [FD 1 RT 60 FD 1 LT 60]
+    model: 'REPEAT 2 [FD 1 RT 60 FD 1 LT 60]'
+                                             *
+                                            **
+                                            *
+OK  tries=1 ink= 15  'a staircase'                    REPEAT 3 [FD 2 RT 90 FD 3 LT 90]
+    model: 'REPEAT 3 [FD 2 RT 90 FD 3 LT 90]'
+                                                  ***
+                                                  *
+                                               ****
+                                               *
+                                            ****
+                                            *
+                                            *
+OK  tries=1 ink=  6  'a zigzag'                       REPEAT 3 [FD 1 RT 90 FD 1 LT 90]
+    model: 'REPEAT 3 [FD 1 RT 90 FD 1 LT 90]'
+                                              *
+                                             **
+                                            **
+                                            *
+OK  tries=1 ink= 23  'a spiral'                       REPEAT 10 [FD 10 RT 90 FD 10 LT 90]
+    model: 'REPEAT 10 [FD 10 RT 90 FD 10 LT 90]'
+                                                      *
+                                                      *
+                                            ***********
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 35  'a big triangle'                 REPEAT 5 [FD 10 RT 120 FD 10 LT 120]
+    model: 'REPEAT 5 [FD 10 RT 120 FD 10 LT 120]'
+                                                     *   **  *
+                                                     *     ***
+                                            *        *      **
+                                            ***      *
+                                            *  *     *
+                                            *   **   *
+                                            *     ** *
+                                            *       **
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 16  'a small square'                 REPEAT 4 [FD 4 RT 90]
+    model: 'REPEAT 4 [FD 4 RT 90]'
+                                            *****
+                                            *   *
+                                            *   *
+                                            *   *
+                                            *****
+12/12 drew something (12 on the first try)
+=== primer F-named-line-last
+BAD tries=3 ink=  0  'a hexagon'                      FD 120 RT 60 REPEAT 6   [line 2: expected a command, found end of program]
+    model: 'FD 120 RT 60 REPEAT 6'
+    last:  'FD 120 RT 60 REPEAT 6  \nError: line 2: expected a command, found end of program'
+BAD tries=3 ink=  0  'a pentagon'                     FD 100 RT 144 RT 144 RT 144 RT 144 FD 100 REPEAT 5   [line 2: expected a command, found end of program]
+    model: 'FD 100 RT 144 RT 144 RT 144 RT 144 FD 100 REPEAT 5'
+    last:  'FD 100 RT 144 RT 144 RT 144 RT 144 FD 100 REPEAT 5'
+OK  tries=1 ink= 37  'an octagon'                     FD 80 RT 120 REPEAT 8 [FD 80 RT 120]
+    model: 'FD 80 RT 120 REPEAT 8 [FD 80 RT 120]'
+                                            *                    **
+                                            *                  **
+                                            *                **
+                                            *               *
+                                            *             **
+                                            *           **
+                                            *         **
+                                            *        **
+                                            *      **
+                                            *    **
+                                            *  **
+                                            * **
+                                            **
+OK  tries=1 ink= 10  'a star'                         FD 10 RT 144
+    model: 'FD 10 RT 144'
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+BAD tries=1 ink=  0  'a house'                        FD 8000 [FD 10 RT 144]   [draws nothing]
+    model: 'FD 8000 [FD 10 RT 144]'
+OK  tries=1 ink= 16  'the letter L'                   FD 6 | RT 90 | FD 10 | RT 144
+    model: 'FD 6  \nRT 90  \nFD 10  \nRT 144'
+                                            **********
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 10  'a plus sign'                    FD 10 RT 144
+    model: 'FD 10 RT 144'
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 34  'a staircase'                    FD 8 | RT 90 | FD 10 | RT 144 | FD 10 | RT 90 | FD 8
+    model: 'FD 8  \nRT 90  \nFD 10  \nRT 144  \nFD 10  \nRT 90  \nFD 8'
+                                          * ***********
+                                          * *       **
+                                           **      **
+                                            *     *
+                                            **  **
+                                            ** **
+                                            * *
+                                            *
+                                            *
+OK  tries=1 ink= 23  'a zigzag'                       FD 8 | RT 120 | FD 8 | RT 120 | FD 8 | RT 120
+    model: 'FD 8  \nRT 120  \nFD 8  \nRT 120  \nFD 8  \nRT 120'
+                                            *
+                                            ***
+                                            *  *
+                                            *   **
+                                            *     **
+                                            *    **
+                                            *  **
+                                            * **
+                                            **
+OK  tries=1 ink= 36  'a spiral'                       FD 10 | RT 144 | FD 10 | RT 144 | FD 10 | RT 144 | FD 10 | RT 144
+    model: 'FD 10  \nRT 144  \nFD 10  \nRT 144  \nFD 10  \nRT 144  \nFD 10  \nRT 144'
+                                            *
+                                            **
+                                            ***  *
+                                            *****
+                                          ***  *
+                                        **  *   *
+                                          ***   **
+                                            ******
+                                            *    **
+                                            *
+                                            *
+BAD tries=3 ink=  0  'a big triangle'                 FD 10000 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT   [line 2: not enough inputs to RT]
+    model: 'FD 10000 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT'
+    last:  'FD 10000 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT 120 RT'
+BAD tries=3 ink=  0  'a small square'                 FD 10 RT 90 REPEAT 4   [line 2: expected a command, found end of program]
+    model: 'FD 10 RT 90 REPEAT 4'
+    last:  'FD 10 RT 90 REPEAT 4'
+7/12 drew something (7 on the first try)
+=== primer C-rule
+OK  tries=1 ink= 34  'a hexagon'                      REPEAT 6 [FD 6 RT 60]
+    model: 'To write the **hexagon** program, we need to repeat the **glyph** `LOGO` **six times**, each time rotating it by `360/6 = 60 degrees`.\n\nHere is the program:\n\n```lisp\nREPEAT 6 [FD 6 RT 60]'
+                                                 *
+                                               ** **
+                                              **    **
+                                            **        *
+                                            *         *
+                                            *         *
+                                            *         *
+                                            *         *
+                                            *         *
+                                            *         *
+                                             **      **
+                                               *   **
+                                                ***
+BAD tries=3 ink=  0  'a pentagon'                     REPEAT 5 [FD 6 RT]   [line 1: not enough inputs to RT]
+    model: 'To write the **pentagon** program, we need to repeat the **glyph** `LOGO` **five times**, each time rotating it by an angle of `360/5 = 72 degrees`.\n\nHere is the program:\n\n```lisp\nREPEAT 5 [FD 6
+    last:  'Corrected program:  \nREPEAT 5 [FD 6 RT]'
+BAD tries=3 ink=  0  'an octagon'                     REPEAT 8 [FD 6 RT 45   [line 1: '[' opened here has no matching ']']
+    model: "To write the program for an **octagon** using the **REPEAT** command, we need to repeat the **FD 6 RT 360/8** command 8 times.\n\nHere's the program:\n\n```lisp\nREPEAT 8 [FD 6 RT 360/8"
+    last:  'REPEAT 8 [FD 6 RT 45'
+BAD tries=1 ink=  0  'a star'                         -   [no Glyph program found in the model output]
+    model: 'To write the **Glyph program** for a **star**, we need to create a **star polygon** with a certain number of sides. Since the example given is a **square** (4 sides), we can generalize this to any nu
+BAD tries=1 ink=  0  'a house'                        -   [no Glyph program found in the model output]
+    model: 'To create a **house** using the **LOGO** programming language, we can break it down into parts:\n\n- **Top**: A **triangle** (3 sides) repeated 4 times.\n- **Bottom**: A **rectangle** (4 sides) repea
+BAD tries=1 ink=  0  'the letter L'                   -   [no Glyph program found in the model output]
+    model: 'To write the program for the letter **L** using the given pattern, we need to replicate the **LOGO** glyph **"Glyph"** on an 80x24 text screen. The **LOGO** glyph is made up of a **square** with a **
+OK  tries=1 ink= 24  'a plus sign'                    FD 6 RT 90 | FD 6 RT 90 | FD 6 RT 90 | FD 6 RT 90
+    model: 'To create a plus sign (which is a **2x2 square**), we can use the following **FD** commands:\n\n```fsharp\nFD 6 RT 90\nFD 6 RT 90\nFD 6 RT 90\nFD 6 RT 90\n```'
+                                            *******
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *******
+BAD tries=3 ink=  0  'a staircase'                    REPEAT 10 [FD 6 RT 3   [line 1: '[' opened here has no matching ']']
+    model: "To create a **staircase** using the **LOGO** programming language, we can use a **loop** to repeat the **glyph** of a **square** (or any polygon) multiple times. Here's the program:\n\n```lisp\nREPEA
+    last:  'Corrected program:\n\nREPEAT 10 [FD 6 RT 3'
+OK  tries=1 ink=  7  'a zigzag'                       REPEAT 80 [FD 6 RT 360/2]
+    model: "To create a **zigzag** pattern using the given **LOGO** syntax, we can repeat the **glyph** `LOGO` by **zigzagging** it. Here's the program:\n\n```logo\nREPEAT 80 [FD 6 RT 360/2]\n```\n\n###"
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+BAD tries=3 ink=  0  'a spiral'                       REPEAT 80 6 RT 360 24   [line 1: expected a command, found a number]
+    model: "Here's the program for a **spiral** using the **FD** and **RT** commands, similar to the **LOGO** example:\n\n```lisp\nREPEAT 80 6 RT 360 24\n```\n\n### Explanation:\n- `REPEAT 80` —"
+    last:  'The corrected program is:\n\nREPEAT 80 6 RT 360 24'
+BAD tries=1 ink=  0  'a big triangle'                 -   [no Glyph program found in the model output]
+    model: 'To write the **big triangle** using the **same pattern** as the **glyph** (LOGO), we need to repeat the **same shape** (a triangle) **N times**.\n\n### Triangle pattern:\n- A triangle has **3 sides**
+BAD tries=1 ink=  0  'a small square'                 -   [no Glyph program found in the model output]
+    model: 'To write the **small square** using the given pattern, we need to repeat the **same shape** (a square) **4 times**.\n\n### Pattern:\n- A square has **4 sides**.\n- Each side is **6 units long**.\n- E
+3/12 drew something (3 on the first try)
+=== primer G-instructions
+OK  tries=2 ink= 13  'a hexagon'                      REPEAT 6 [ FD 60 RT 60 LT 60 ]
+    model: "Here's a **LOGO** program that draws a **hexagon**, using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`.\n\n```logo\nREPEAT 6 [ FD 60 RT 60 LT"
+    last:  'The corrected program is:\n\nREPEAT 6 [ FD 60 RT 60 LT 60 ]'
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+BAD tries=3 ink=  0  'a pentagon'                     REPEAT 5 [ FD 1   [line 1: '[' opened here has no matching ']']
+    model: "Here's a **LOGO** program that draws a **pentagon** using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`. The output is the complete program.\n\n```log\nREPEAT 5 [ FD 1"
+    last:  'Corrected program:\n\nREPEAT 5 [ FD 1'
+OK  tries=1 ink= 24  'an octagon'                     REPEAT 8 [ FD 100 RT 45 ]
+    model: "Here's a **LOGO** program that draws an **octagon**, using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`.\n\n```logo\nREPEAT 8 [ FD 100 RT 45 ]"
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                             *
+OK  tries=1 ink= 44  'a star'                         REPEAT 5 [FD 10 RT 72]
+    model: "Here's a **LOGO** program that draws a **star** using only the allowed commands:\n\n```log\nREPEAT 5 [FD 10 RT 72]\n```\n\n### Explanation:\n- `FD 10` draws a line of length 10.\n- `RT 72"
+                                                 **** *
+                                              ***      *
+                                            **          *
+                                            *           *
+                                            *            *
+                                            *             *
+                                            *              *
+                                            *              *
+                                            *              *
+                                            *             *
+                                            *            *
+                                            *           *
+                                            **          *
+                                              ***      *
+OK  tries=2 ink= 24  'a house'                        REPEAT 4 [FD 6 RT 90]
+    model: "Here's a **LOGO** program that draws a **house**, using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`.\n\n```logo\nREPEAT 4 [FD 6 RT 90]\nREPEAT"
+    last:  'The corrected program is:\n\nREPEAT 4 [FD 6 RT 90]'
+                                            *******
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *******
+OK  tries=2 ink= 12  'the letter L'                   REPEAT 2 [FD 6 RT 90]
+    model: "Here's a **LOGO** program that draws the letter **L**, using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`.\n\n```logo\nREPEAT 2 [FD 6 RT 90]\nREPEAT"
+    last:  'The corrected program is:\n\nREPEAT 2 [FD 6 RT 90]'
+                                            ******
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=1 ink= 24  'a plus sign'                    REPEAT 2 [FD 6 RT 90] | REPEAT 2 [FD 6 RT 90]
+    model: "Here's a **LOGO** program that draws a **plus sign** using only the allowed commands:\n\n```log\nREPEAT 2 [FD 6 RT 90]\nREPEAT 2 [FD 6 RT 90]\n```\n\n### Explanation:\n- `FD 6` draws a horizontal"
+                                            *******
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *******
+OK  tries=2 ink= 13  'a staircase'                    REPEAT 5 [FD 10 RT 20] | REPEAT 4 [FD 10 RT 10] | REPEAT 3 [FD 10 RT 10]
+    model: "Here's a **LOGO** program that draws a **staircase** using only the allowed commands:\n\n```log\nREPEAT 5 [FD 10 RT 20]\nREPEAT 4 [FD 10 RT 10]\nREPEAT 3 [FD 10 RT"
+    last:  'The corrected program is:\n\nREPEAT 5 [FD 10 RT 20]  \nREPEAT 4 [FD 10 RT 10]  \nREPEAT 3 [FD 10 RT 10]'
+                                             *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+OK  tries=2 ink= 13  'a zigzag'                       REPEAT 4 [FD 6]
+    model: "Here's a **LOGO** program that draws a **zigzag** using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`. The output is the program itself.\n\n```log\nREPEAT 4 [FD 6"
+    last:  'REPEAT 4 [FD 6]'
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+                                            *
+BAD tries=3 ink=  0  'a spiral'                       REPEAT 1 | REPEAT 1   [line 3: expected a command, found end of program]
+    model: "Here's a **LOGO** program that draws a **spiral** using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`. The spiral is created by repeating a sequence of commands.\n\n```log
+    last:  'REPEAT 1  \nREPEAT 1  \nError: line 3: expected a command, found end of program'
+OK  tries=2 ink= 37  'a big triangle'                 REPEAT 3 [ FD 100 RT 120 ]
+    model: "Here's a **LOGO** program that draws a **big triangle**, using only the commands: `FD`, `BK`, `RT`, `LT`, `PU`, `PD`, and `REPEAT n [ ]`.\n\n```logo\nREPEAT 3 [ FD 100 RT 120"
+    last:  'The corrected program is:\n\nREPEAT 3 [ FD 100 RT 120 ]'
+                                            *                    **
+                                            *                  **
+                                            *                **
+                                            *               *
+                                            *             **
+                                            *           **
+                                            *         **
+                                            *        **
+                                            *      **
+                                            *    **
+                                            *  **
+                                            * **
+                                            **
+OK  tries=1 ink= 24  'a small square'                 REPEAT 4 [FD 6 RT 90]
+    model: "Here's a **LOGO** program that draws a **small square** using only the allowed commands:\n\n```log\nREPEAT 4 [FD 6 RT 90]\n```\n\n### Explanation:\n- `FD 6`: Move forward 6 units.\n- `RT 90`: Turn ri
+                                            *******
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *     *
+                                            *******
+10/12 drew something (4 on the first try)

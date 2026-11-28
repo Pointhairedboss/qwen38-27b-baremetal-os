@@ -101,7 +101,35 @@ about 5 seconds.
 
 `tools/draw_eval.py` runs the `/draw` loop on the Linux build (`build/asm-llm`,
 token-identical to the kernel, about 25 s per request) and replays each program.
-The measured comparison of the candidate prompts will be recorded here.
+Seven prompts were compared on the same 12 requests: hexagon, pentagon, octagon,
+star, house, the letter L, plus sign, staircase, zigzag, spiral, big triangle,
+small square. All used greedy decoding, 64 tokens per reply, up to 2 repairs and
+the final extractor. The prompts' full text, every reply and every drawing are in
+`docs/draw-eval.txt`.
+
+| Prompt | Draws something | First try | Right shape (by eye) |
+|---|---|---|---|
+| **H (kept)**: labelled examples (square, triangle, circle), ends `{REQUEST}:` | 12/12 | 12 | **3**: hexagon `REPEAT 6 [FD 10 RT 60]`, pentagon `REPEAT 5 [FD 10 RT 72]`, big triangle |
+| H2: as H with a star instead of the triangle | 12/12 | 11 | 1: big triangle |
+| H3: as H plus a steps example | 12/12 | 12 | 0 |
+| B: named examples, steps last, "Write only the Glyph program for …" | 12/12 | 12 | 2: staircase (the example itself), small square |
+| F: named examples, `line: FD 8` last | 7/12 | 7 | 0 |
+| C: a rule, "a shape with N sides is REPEAT N [FD 6 RT 360/N]", one example | 3/12 | 3 | 1: hexagon |
+| G: instructions listing the commands, one example | 10/12 | 4 | 2: the L, small square (its octagon and big triangle are right but far larger than the screen) |
+
+What the 0.6B model does:
+- It copies the form of the nearest example: steps-shaped programs after a steps
+  example, `FD … RT …` lines after `line: FD 8`.
+- Labelled examples ending in `{REQUEST}:` get the shortest answers in the format
+  the extractor handles best.
+- Explaining the rule, or listing the commands, makes it chatty: it writes prose,
+  runs out of tokens or leaves brackets open.
+- Under H it knows polygon turning angles (60 for 6 sides, 72 for 5), but not
+  stars (144), composite shapes (a house) or letters.
+
+"Right shape" is a judgement from one greedy reply per request, so treat the
+counts as indicative. H was kept because it has the most right shapes and every
+reply worked first time, which matters at about 9 minutes per attempt under TCG.
 
 ## Verified end to end under QEMU
 
@@ -132,9 +160,9 @@ they are wide, so the figure also looks stretched (SPEC §7).
 
 ## Limits
 
-- **The model is small.** Qwen3-0.6B writes valid Glyph almost every time, but it
-  gets the shape right only for simple polygons (see the table). A larger model is
-  the fix; the loop does not depend on the model.
+- **The model is small.** With the kept prompt, Qwen3-0.6B wrote a working program
+  for 12 of 12 requests, but only 3 had the right shape (simple polygons; see the
+  table). A larger model is the fix; the loop does not depend on which model it is.
 - **`/draw` starts a new chat**, as `/bench` does (D28).
 - **Greedy decoding only.** `/draw` sets temperature 0 for its turn, whatever the
   kernel was booted with, so the same request always gives the same drawing.

@@ -196,8 +196,9 @@ back unchanged, so `/draw` stops and says so.
 <a id="d30"></a>**D30 — The prompt was chosen by measurement, on Linux.**
 `tools/draw_eval.py` runs the `/draw` loop on `build/asm-llm`, which is
 token-identical to the kernel, so a prompt can be scored in about 25 seconds per
-request instead of minutes under TCG. Five prompts were compared (docs/DRAW.md);
-the labelled-examples prompt was kept. The prompt is a text file
+request instead of minutes under TCG. Seven prompts were compared on 12 requests
+(docs/DRAW.md, `docs/draw-eval.txt`). The labelled-examples prompt was kept:
+12/12 working programs on the first try, and the most right shapes (3/12). The prompt is a text file
 (`tools/draw_primer.txt`) assembled into the kernel with `incbin`, so the file the
 tools score is the file the kernel uses.
 
