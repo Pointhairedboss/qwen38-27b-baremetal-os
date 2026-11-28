@@ -103,8 +103,30 @@ The measured comparison of the candidate prompts will be recorded here.
 
 ## Verified end to end under QEMU
 
-`tests/qemu_draw.py` checks `/draw` in the kernel against the Linux reference;
-its results will be recorded here.
+`tests/qemu_draw.py`, 2026-11-28: QEMU 8.2 TCG (no KVM), 4 vCPUs, `-cpu max`, 2 GiB,
+real Qwen3-0.6B Q8_0, on the final kernel. **7/7 checks pass.**
+
+| Check | Result |
+|---|---|
+| `/draw` with no request | usage line; nothing generated; chat untouched |
+| `/draw a hexagon`: prompt token IDs vs `build/asm-llm` on Linux | identical (77 tokens with the chat template) |
+| Generated token IDs vs Linux | identical, 18 tokens: `a hexagon: REPEAT 6 [FD 10 RT 60]` |
+| Attempts | 1, as on Linux (the program loaded first time) |
+| The program drawn on VGA vs the Linux extraction; ESC returns | identical (`REPEAT 6 [FD 10 RT 60]`); pass |
+| Question after `/draw`: "What is the capital of France? Answer in one word." vs Linux | identical: `59604` ("Paris") |
+
+Prefill took 393 s for 77 tokens (0.20 tokens/s) and decoding took 130 s for 18
+tokens, so one `/draw` took about 9 minutes under emulation. The COM1 transcript
+is `docs/draw-serial.txt`. Screenshots:
+
+| The drawing (VGA) | After ESC |
+|---|---|
+| ![/draw a hexagon on VGA](screenshots/vm-13-draw.png) | ![the program and the prompt after ESC](screenshots/vm-14-draw-after.png) |
+
+The hexagon's top edge is clipped. The turtle starts in the middle of the 24-row
+screen facing up, and the model's side of 10 cells takes it past the top. Cells
+off the screen are not drawn (SPEC §7–8). Text cells are about twice as tall as
+they are wide, so the figure also looks stretched (SPEC §7).
 
 ## Limits
 
@@ -114,7 +136,7 @@ its results will be recorded here.
 - **`/draw` starts a new chat**, as `/bench` does (D28).
 - **Greedy decoding only.** `/draw` sets temperature 0 for its turn, whatever the
   kernel was booted with, so the same request always gives the same drawing.
-- **Under TCG it is slow**: several minutes per `/draw` (about 5 s per token). With KVM or on hardware it
-  is a few seconds.
+- **Under TCG it is slow**: about 9 minutes per `/draw a hexagon` (95 tokens at
+  about 5 s each). With KVM or on hardware it is a few seconds.
 - Phase 4 links the same object but has no `glyph_generate` hook yet, so `/draw`
   says it is not available there (D31).

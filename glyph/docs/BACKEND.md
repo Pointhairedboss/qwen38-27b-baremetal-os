@@ -111,7 +111,7 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
 |---|---|---|
 | Core compiles with kernel flags, zero undefined symbols | `make freestanding` | pass |
 | Core + adapter + shims link against the fork's own `drivers.asm` (Phase 2 and Phase 4); every Glyph import resolves | `make baremetal-link` | pass. What remains is provided by the kernel: `g_boot_tsc` (needed by `drivers.asm`, from `boot.asm`) and, for `/draw`, `g_ctx` (`shared/transformer.asm`) and the weak `glyph_generate` (Phase 2 `kernel.asm`). |
-| Full link of the Phase 2 kernel (as pinned at `6c43dec`, and as changed for `/glyph` and `/draw`) and the unmodified Phase 4 kernel, with the fork's linker scripts and ld flags; Phase 4 keeps the Glyph entry points with `ld -u` | `make kernel-link` | pass. Multiboot magic stays at file offset 4096. The pinned Phase 2 image is 24 252 B, the size the fork's README documents. With Glyph it is 108 816 B (`.text` +51.2 KB, `.bss` +217 KB: two VMs of 85 KB, for programs and for `/draw`'s extraction, plus buffers). Phase 4 goes from 33 052 to 114 972 B. |
+| Full link of the Phase 2 kernel (as pinned at `6c43dec`, and as changed for `/glyph` and `/draw`) and the unmodified Phase 4 kernel, with the fork's linker scripts and ld flags; Phase 4 keeps the Glyph entry points with `ld -u` | `make kernel-link` | pass. Multiboot magic stays at file offset 4096. The pinned Phase 2 image is 24 252 B, the size the fork's README documents. With Glyph it is 108 880 B (`.text` +51.2 KB, `.bss` +217 KB: two VMs of 85 KB, for programs and for `/draw`'s extraction, plus buffers). Phase 4 goes from 33 052 to 114 972 B. |
 | **Boot in a VM.** `build/glyph-os.elf` is the fork's unmodified Phase 2 `boot.asm`, `drivers.asm`, `runtime.asm` and `linker.ld`, plus Glyph and `src/baremetal/glyph_os.c` (`kernel_main`), following the precedent of Phase 4's `bartest`. It boots under QEMU 8.2 (TCG, no KVM) via Multiboot. | `make glyph-os`, `make qemu-run` | pass. 88 KB image with 55 programs embedded. Boots and runs them all in under 1 s. |
 | **Bare-metal conformance.** The kernel boots with `glyph=test`, writes every embedded transcript to COM1 and powers off. The host compares each one byte for byte with the Linux `.expect`. | `make qemu-test` | **55/55 identical** (46 corpus cases and 9 examples), with `-cpu max` (AVX enabled by `boot.asm`) and with `-cpu qemu64` (no AVX). |
 | **VGA and PS/2 path.** Keys sent through the QEMU monitor (`sendkey`) arrive as scancodes on the emulated i8042 and go through the fork's `ps2_try_getc`. Screens are taken with `screendump` from the emulated VGA text buffer. | `make vm-screenshots` | pass. Interactive Turing machine, demo (typing a name with Shift), menu and Rule 110: `docs/screenshots/vm-*.png`. |
@@ -126,7 +126,7 @@ Glyph inside the Qwen inference kernel, with the real model, is verified in §5.
 ## 5. Integration into the inference kernel (Phase 2: implemented and tested under QEMU)
 
 **Status.** Implemented with the owner's go-ahead, and it builds and links: the
-root `make os` produces `build/asm-llm-os.elf` at 108 816 B, against 24 252 B for
+root `make os` produces `build/asm-llm-os.elf` at 108 880 B, against 24 252 B for
 the pinned upstream kernel (`tests/kernel_link.sh`). At the `asm-llm>` prompt:
 
 - `/glyph` lists the built-in programs.
@@ -150,6 +150,13 @@ Under TCG, prefill ran at about 0.18 tokens/s (about 2.5 min per answer). That i
 emulation speed, not a property of the kernel. `glyph/tools/qemu_showcase.py`
 recorded `docs/screenshots/inference-glyph.gif`: `/glyph demo`, `/glyph rule110`,
 then "Tokyo".
+
+**`/draw` result (2026-11-28, same setup, final kernel).** `glyph/tests/qemu_draw.py`
+passed all 7 checks. `/draw a hexagon`: the prompt (77 tokens) and the
+generated tokens (18: `a hexagon: REPEAT 6 [FD 10 RT 60]`) are identical to
+`build/asm-llm` on Linux. The kernel drew the program the Linux extraction gives,
+on the first attempt, and ESC returned. The next question is still answered
+`59604` ("Paris"), identical to Linux. Details and screenshots are in docs/DRAW.md.
 
 **Not yet done:**
 - The fork's own five-prompt parity suite (`scripts/verify_os.py`), which needs KVM.
