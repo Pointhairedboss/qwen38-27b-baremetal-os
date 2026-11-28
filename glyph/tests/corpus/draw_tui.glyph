@@ -1,0 +1,17 @@
+; draw_tui.glyph — the text-UI look: Unicode strings become VGA (CP437)
+; characters, lines and boxes join, a panel inside a panel is a group, and
+; NUMBER turns field text into a number.
+SCREEN 44 14
+SET total 0
+PANEL w 0 0 44 14 "Tools ♦ test"
+PANEL g 2 2 20 6 "Group"
+BOX 24 2 9 5
+BOX 32 2 9 5
+LINE 24 4 40 4
+LABEL l 4 3 "♥ café ±5° ½"
+LABEL s 4 4 "░▒▓█ ▀▄▌▐ ☺►"
+FIELD n 4 6 8 add2
+BUTTON b 24 9 "Go" add2
+LABEL t 24 11 :total
+TEXT 3 9 "no glyph: 😀"
+ON add2 [IF NUMBERP :n [SET total (NUMBER :n) * 2]]

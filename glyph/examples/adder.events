@@ -1,0 +1,21 @@
+# Add 12 and 30 (focus order: a b go clr), then try letters, then Clear.
+frame
+type "12"
+key TAB
+type "30"
+key ENTER
+frame
+key TAB
+key TAB
+key TAB
+key BS
+key BS
+type "ten"
+key ENTER
+frame
+key TAB
+key TAB
+key TAB
+key ENTER
+frame
+state

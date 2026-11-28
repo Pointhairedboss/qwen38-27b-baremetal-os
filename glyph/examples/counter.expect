@@ -7,13 +7,13 @@ main: ok steps=1 changed=COUNT focus=DEC
 @ key ENTER -> ok action=UP steps=1 changed=COUNT focus=INC
 @ click dec -> ok action=DOWN steps=1 changed=COUNT focus=DEC
 @ frame
- 0|+ Counter -----------------------+
- 1||                                |
- 2|| Count: 2                       |
- 3||                                |
- 4|| > -1 < [ +1 ] [ Reset ]        |
- 5||                                |
- 6|+--------------------------------+
+ 0|╔ Counter ═══════════════════════╗
+ 1|║                                ║
+ 2|║ Count: 2                       ║
+ 3|║                                ║
+ 4|║ ▐►-1◄▌ ▐ +1 ▌ ▐ Reset ▌        ║
+ 5|║                                ║
+ 6|╚════════════════════════════════╝
 @ state
   COUNT = 2
 @ click clr -> ok action=ZERO steps=1 changed=COUNT focus=CLR

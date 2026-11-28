@@ -75,12 +75,20 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
 
 ## 3. The adapter (`src/baremetal/glyph_bm.c`)
 
-- **Rendering.** Each frame is `vga_clear(0x07)`, then every cell goes through
-  `vga_set_color` (only when the attribute changes) and `vga_putc_utf8`. Rows
-  narrower than 80 end with `'\n'`; full rows wrap by themselves. Glyph frames are
-  at most 80 × 24, so the status line lands on VGA row 24, and it is capped at 79
-  characters so the driver never scrolls. No frame buffer or shadow screen is added.
-  The program's canvas lives inside `glyph_vm` (see DECISIONS D6).
+- **Rendering.** Cells are copied straight into VGA text memory at `0xB8000`,
+  the 80 × 25 buffer the driver itself writes (D33). A Glyph cell is a VGA cell
+  (CP437 character + attribute), so each row is a plain copy: no flicker, and
+  box-drawing and block characters appear as they should. The driver's
+  `vga_putc_utf8` would show them as `?`.
+  - The app is centred on a shaded desktop (`░`, dark grey on blue), with its
+    window shadow.
+  - The status line is row 24, in cyan.
+  - The hardware cursor, which the driver never moves, is hidden for the
+    session (CRTC register 0x0A bit 5) and restored after.
+  - On exit, `vga_clear` resets the screen and the driver's cursor for the
+    prompt.
+  - No frame buffer or shadow screen is added. The program's canvas lives
+    inside `glyph_vm` (see DECISIONS D6).
 - **Input.** `serial_try_getc()` first, then `ps2_try_getc()`, as `console_readline`
   does. Ctrl-D ends the session, ESC exits, and `pause` runs while idle.
 - **Storage.** `static glyph_vm` (85 KB in v0.2) and a 32 KB transcript buffer in `.bss`.
@@ -185,13 +193,8 @@ and no core is reserved.
 identical transcripts.
 
 **Things to check during G4:**
-- Rendering is the only cost. A full frame is about 1 920 `vga_putc_utf8` calls, and
-  `vga_clear` produces visible flicker on each redraw. The VGA hardware cursor also
-  stays at the top-left cell during a Glyph session, because the drivers have no
-  call to move or hide it. A five-instruction
-  `vga_goto(row, col)` in `drivers.asm` would let the adapter skip the clear. That
-  extends the driver rather than duplicating it, but it is a kernel change, so it
-  has been left for the owner to decide.
+- Rendering: resolved by writing VGA text memory directly and hiding the
+  hardware cursor during a session (D33). No driver change was needed.
 - Under `-nographic` (serial only) the VGA UI is invisible. A serial renderer
   (ANSI over COM1) is a possible second bare-metal backend; COM1 at 115 200 baud
   needs about 170 ms per full frame.

@@ -2,13 +2,13 @@ glyph 0.2
 load: ok code=369 names=51 components=16 state=7 arrays=4 procs=11 handlers=5
 main: ok steps=1290 changed=HEAD,STATE,STEPS,ONES,SNAME,MACHINE,STATUS focus=B2
 @ frame
- 0|+ Turing machine in Glyph -----------------------------------------------------+
- 1|| machine: 4-state busy beaver          state: A     steps: 0      ones: 0     |
- 2|| ready                                                                        |
- 3||                                                                              |
- 4|| > BB-2 < [ BB-3 ] [ BB-4 ]   [ Step ] [ Run ]   TAB, ENTER, ESC quits        |
- 5||                                                                              |
- 6|+------------------------------------------------------------------------------+
+ 0|╔ Turing machine in Glyph ═════════════════════════════════════════════════════╗
+ 1|║ machine: 4-state busy beaver          state: A     steps: 0      ones: 0     ║
+ 2|║ ready                                                                        ║
+ 3|║                                                                              ║
+ 4|║ ▐►BB-2◄▌ ▐ BB-3 ▌ ▐ BB-4 ▌   ▐ Step ▌ ▐ Run ▌   TAB, ENTER, ESC quits        ║
+ 5|║                                                                              ║
+ 6|╚══════════════════════════════════════════════════════════════════════════════╝
  7|
  8|
  9|................................................................................
@@ -37,13 +37,13 @@ main: ok steps=1290 changed=HEAD,STATE,STEPS,ONES,SNAME,MACHINE,STATUS focus=B2
 @ key TAB -> ok focus=BR
 @ key ENTER -> ok action=DORUN steps=1112 changed=HEAD,STATE,STEPS,ONES,SNAME,STATUS focus=BR
 @ frame
- 0|+ Turing machine in Glyph -----------------------------------------------------+
- 1|| machine: 3-state busy beaver          state: halt  steps: 14     ones: 6     |
- 2|| halted after 14 steps                                                        |
- 3||                                                                              |
- 4|| [ BB-2 ] [ BB-3 ] [ BB-4 ]   [ Step ] > Run <   TAB, ENTER, ESC quits        |
- 5||                                                                              |
- 6|+------------------------------------------------------------------------------+
+ 0|╔ Turing machine in Glyph ═════════════════════════════════════════════════════╗
+ 1|║ machine: 3-state busy beaver          state: halt  steps: 14     ones: 6     ║
+ 2|║ halted after 14 steps                                                        ║
+ 3|║                                                                              ║
+ 4|║ ▐ BB-2 ▌ ▐ BB-3 ▌ ▐ BB-4 ▌   ▐ Step ▌ ▐►Run◄▌   TAB, ENTER, ESC quits        ║
+ 5|║                                                                              ║
+ 6|╚══════════════════════════════════════════════════════════════════════════════╝
  7|
  8|
  9|......................................111111....................................
@@ -56,13 +56,13 @@ main: ok steps=1290 changed=HEAD,STATE,STEPS,ONES,SNAME,MACHINE,STATUS focus=B2
 @ click bs -> ok action=DOSTEP steps=992 changed=HEAD,STATE,STEPS,ONES,SNAME focus=BS
 @ click bs -> ok action=DOSTEP steps=993 changed=HEAD,STATE,STEPS,SNAME focus=BS
 @ frame
- 0|+ Turing machine in Glyph -----------------------------------------------------+
- 1|| machine: 4-state busy beaver          state: B     steps: 3      ones: 2     |
- 2|| ready                                                                        |
- 3||                                                                              |
- 4|| [ BB-2 ] [ BB-3 ] [ BB-4 ]   > Step < [ Run ]   TAB, ENTER, ESC quits        |
- 5||                                                                              |
- 6|+------------------------------------------------------------------------------+
+ 0|╔ Turing machine in Glyph ═════════════════════════════════════════════════════╗
+ 1|║ machine: 4-state busy beaver          state: B     steps: 3      ones: 2     ║
+ 2|║ ready                                                                        ║
+ 3|║                                                                              ║
+ 4|║ ▐ BB-2 ▌ ▐ BB-3 ▌ ▐ BB-4 ▌   ▐►Step◄▌ ▐ Run ▌   TAB, ENTER, ESC quits        ║
+ 5|║                                                                              ║
+ 6|╚══════════════════════════════════════════════════════════════════════════════╝
  7|
  8|
  9|.......................................11.......................................
@@ -72,13 +72,13 @@ main: ok steps=1290 changed=HEAD,STATE,STEPS,ONES,SNAME,MACHINE,STATUS focus=B2
 13|
 @ click br -> ok action=DORUN steps=1922 changed=HEAD,STATE,STEPS,ONES,SNAME,STATUS focus=BR
 @ frame
- 0|+ Turing machine in Glyph -----------------------------------------------------+
- 1|| machine: 4-state busy beaver          state: halt  steps: 107    ones: 13    |
- 2|| halted after 107 steps                                                       |
- 3||                                                                              |
- 4|| [ BB-2 ] [ BB-3 ] [ BB-4 ]   [ Step ] > Run <   TAB, ENTER, ESC quits        |
- 5||                                                                              |
- 6|+------------------------------------------------------------------------------+
+ 0|╔ Turing machine in Glyph ═════════════════════════════════════════════════════╗
+ 1|║ machine: 4-state busy beaver          state: halt  steps: 107    ones: 13    ║
+ 2|║ halted after 107 steps                                                       ║
+ 3|║                                                                              ║
+ 4|║ ▐ BB-2 ▌ ▐ BB-3 ▌ ▐ BB-4 ▌   ▐ Step ▌ ▐►Run◄▌   TAB, ENTER, ESC quits        ║
+ 5|║                                                                              ║
+ 6|╚══════════════════════════════════════════════════════════════════════════════╝
  7|
  8|
  9|.............................1.111111111111.....................................

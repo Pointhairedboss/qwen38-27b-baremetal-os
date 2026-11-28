@@ -91,7 +91,7 @@ with tempfile.TemporaryDirectory() as tmp:
     for name, got in blocks:
         kind, base = name.split("/", 1)
         path = os.path.join("glyph", "examples" if kind == "examples" else "tests/corpus", base + ".expect")
-        with open(path, encoding="latin-1") as f:
+        with open(path, encoding="utf-8") as f:           # transcripts are UTF-8, as the serial text
             same += got == f.read()
     check("/glyphtest inside the inference kernel: transcripts identical to host",
           same == len(blocks) == int(m.group(1)), f"{same}/{m.group(1)}")

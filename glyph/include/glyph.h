@@ -72,13 +72,20 @@ typedef uint16_t glyph_cell;
 #define GLYPH_CELL_CH(c)     ((unsigned char)((c) & 0xFFu))
 #define GLYPH_CELL_ATTR(c)   ((unsigned char)(((c) >> 8) & 0xFFu))
 
-#define GLYPH_ATTR_DEFAULT   0x07
-#define GLYPH_ATTR_PANEL     0x0B
-#define GLYPH_ATTR_TITLE     0x0F
-#define GLYPH_ATTR_LABEL     0x0F
-#define GLYPH_ATTR_CONTROL   0x1F
-#define GLYPH_ATTR_FOCUS     0x70
-#define GLYPH_ATTR_DISABLED  0x08
+/* The default look ("blue desktop" text UI, VGA attribute bytes). */
+#define GLYPH_ATTR_DEFAULT   0x07   /* canvas: grey on black */
+#define GLYPH_ATTR_PANEL     0x1F   /* panel frame: white on blue */
+#define GLYPH_ATTR_BODY      0x17   /* panel interior: grey on blue */
+#define GLYPH_ATTR_TITLE     0x1E   /* panel title: yellow on blue */
+#define GLYPH_ATTR_LABEL     0x0F   /* label text: bright white (background kept) */
+#define GLYPH_ATTR_CONTROL   0x30   /* button face: black on cyan */
+#define GLYPH_ATTR_FOCUS     0x2F   /* focused button face: white on green */
+#define GLYPH_ATTR_DISABLED  0x38   /* disabled button face: dark grey on cyan */
+#define GLYPH_ATTR_FIELD     0x70   /* field face: black on grey */
+#define GLYPH_ATTR_FIELD_OFF 0x78   /* disabled field face: dark grey on grey */
+#define GLYPH_ATTR_CURSOR    0xF0   /* field cursor: blinking black on grey */
+#define GLYPH_ATTR_SHADOW    0x08   /* shadow: dark grey on black */
+#define GLYPH_ATTR_STATUS    0x30   /* status line: black on cyan */
 
 /* ---- diagnostics and results -------------------------------------------- */
 typedef struct glyph_diag {
@@ -261,6 +268,14 @@ const glyph_diag *glyph_last_diag(const glyph_vm *vm);
 /* Set the per-entry step budget: 0 restores GLYPH_DEFAULT_STEPS; values above
  * GLYPH_MAX_STEPS are clamped. Survives glyph_load. */
 void glyph_set_budget(glyph_vm *vm, uint32_t steps);
+
+/* ---- characters ------------------------------------------------------------ */
+/* Cells hold VGA text-mode codes (code page 437): box drawing, blocks,
+ * shades and symbols as well as ASCII. These convert for text output. */
+uint32_t glyph_cp437_unicode(unsigned char c);       /* code -> Unicode code point */
+int      glyph_cp437_from_unicode(uint32_t cp);      /* -> code, or -1 if none */
+int      glyph_cp437_utf8(unsigned char c, char out[4]);   /* -> UTF-8, returns bytes */
+int      glyph_utf8_encode(uint32_t cp, char out[4]);       /* code point <= 0xFFFF */
 
 /* ---- model output ---------------------------------------------------------- */
 /* Pull a Glyph program out of free-form model output (prose, Markdown fences,

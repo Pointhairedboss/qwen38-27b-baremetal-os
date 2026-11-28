@@ -206,6 +206,53 @@ tools score is the file the kernel uses.
 `glyph_generate` weak, so the same object still links into the Phase 4 kernel,
 which does not have the hook; there `/draw` reports that it is not available.
 
+<a id="d32"></a>**D32 — Good-looking interfaces from text-mode characters, not pixels.**
+The owner rejected a pixel framebuffer as too fragile. VGA text mode already
+has a character set with box-drawing lines, blocks, shades and symbols (code
+page 437), in every VGA-compatible card's font, in the mode the kernel already
+uses. Glyph cells were always VGA cells (character byte plus attribute byte), so
+they now simply hold CP437 codes.
+- The default look is a 1990s DOS-style text UI (Turbo Vision, Norton
+  Commander): windows with double frames and shadows, groups, coloured buttons
+  and fields.
+- It needs no new syntax. The model writes the same simple programs, and the
+  renderer makes them look good.
+- Donors: the look follows Turbo Vision's conventions. Its code is not used,
+  because Borland's release carries no explicit licence. The CP437 table follows
+  the Unicode mapping, checked against Python's codec and the IBM glyph list as
+  used by PDCurses (public domain) (`tests/cp437_check.py`). The line-join table
+  is checked against Unicode character names (`tests/boxjoin_check.py`).
+- Whole TUI libraries (ncurses, termbox2, Turbo Vision, microui) were rejected.
+  They bring event loops, allocation and terminal I/O that Glyph deliberately
+  does without.
+
+<a id="d33"></a>**D33 — The bare-metal adapter writes VGA text memory directly.**
+The kernel driver's `vga_putc_utf8` shows non-ASCII as `?`, and the old
+clear-and-stream redraw flickered. The adapter now:
+- copies cells to `0xB8000`, the buffer the driver itself writes;
+- centres the app on a shaded desktop, with the window's shadow cast on it;
+- writes the status line on row 24;
+- hides the hardware cursor (CRTC register 0x0A) for the session and restores
+  it afterwards.
+
+Keyboard and console text still go through the driver. No kernel file changes.
+
+<a id="d34"></a>**D34 — Strings take UTF-8; transcripts and the terminal give UTF-8.**
+- A model writes `"═══"` or `"♥"`, not CP437 codes. The lexer maps each UTF-8
+  character to its CP437 code, and anything without a glyph (emoji) becomes `?`.
+- Output reverses the mapping, so `.expect` files and the Linux terminal show
+  the screen as it looks.
+- Transcripts stay byte-identical between Linux and bare metal (57/57), because
+  the conversion is in the shared core.
+- Terminals whose locale is not UTF-8 get ASCII line art.
+
+<a id="d35"></a>**D35 — `NUMBER` and `NUMBERP`.** Field text is always a string,
+so a program could not add two typed numbers. UCBLogo avoids this because a word
+that looks like a number *is* a number. Glyph keeps strings and integers apart
+(D19–D20) and adds an explicit converter, which changes no existing behaviour.
+`NUMBERP` is UCBLogo's name for the test. `NUM` was taken by a label in the
+corpus, so the converter is `NUMBER`. `examples/adder.glyph` is the use case.
+
 ## Deviations from bootLogo semantics
 
 Reference: `nanochess/bootLogo` at `e3ce458a6d4eb0c0f41e3fc0f1239e09864b9df0`
@@ -250,13 +297,15 @@ and is clipped to 80 × 24, because text cells are much coarser than CGA pixels.
   inference kernel, real Qwen3-0.6B answers stay token-identical to Linux before
   and after a Glyph session (BACKEND.md §5). Not yet done: the fork's
   `verify_os.py` suite (needs KVM), P510 hardware, and Phase 4.
-- **The VGA adapter clears and redraws the whole screen per input**, which flickers.
-  A positioned-write driver entry would fix this (BACKEND.md §5).
 - Text cells are about 2:1 tall, so turtle figures look stretched. There is no
   aspect correction.
 - Values are integers and short strings. There are no lists, no floating point,
   no `RANDOM` (determinism would need a seeded generator) and no `PRINT`
-  console; output goes through `TEXT` and `LABEL`.
+  console; output goes through `TEXT` and `LABEL`. Strings are opaque: no
+  character access; `NUMBER` converts digits.
+- The turtle still draws whole cells with `*`. A half-block (`▀▄█`) turtle with
+  near-square dots is the planned next step of the text-UI work.
+- Line joins cover horizontal and vertical lines. Diagonals stay `\ /`.
 - No timers or animation; everything is input-driven.
 - No scrolling, multi-line text fields or lists of items.
 - Programs cannot hide, move or re-caption components at run time; only

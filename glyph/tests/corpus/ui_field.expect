@@ -4,7 +4,7 @@ main: ok steps=1 changed=MSG focus=NAME
 @ type "Ada Lovelace" -> ok changed=NAME focus=NAME
 @ frame
  0|
- 1| >Ada Love< Ada Love
+ 1| ►Ada Love◄ Ada Love
  2|
  3| type a name
 @ key BS -> ok changed=NAME focus=NAME
@@ -13,7 +13,7 @@ main: ok steps=1 changed=MSG focus=NAME
 @ key ENTER -> ok action=SUBMIT steps=1 changed=MSG focus=NAME
 @ frame
  0|
- 1| >Ada Lox_< Ada Lox
+ 1| ►Ada Lox_◄ Ada Lox
  2|
  3| Ada Lox
 @ state

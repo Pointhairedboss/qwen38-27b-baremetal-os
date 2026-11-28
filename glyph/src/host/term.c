@@ -44,8 +44,14 @@ static void on_signal(int sig)
     raise(sig);
 }
 
+/* Terminals whose locale is not UTF-8 get ASCII line art instead of the
+ * CP437 box-drawing, block and arrow characters. */
+static int utf8_ok = 1;
+static int locale_is_utf8(void);
+
 int term_open(void)
 {
+    utf8_ok = locale_is_utf8();
     struct termios t;
     if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) return -1;
     if (tcgetattr(STDIN_FILENO, &saved) != 0) return -1;
@@ -82,8 +88,9 @@ static void fbs(const char *s) { fb(s, strlen(s)); }
 static void sgr(int attr)
 {
     char tmp[32];
-    int fg = attr & 7, bright = attr & 8, bg = (attr >> 4) & 7;
-    int n = snprintf(tmp, sizeof tmp, "\x1b[0;%d;%dm", (bright ? 90 : 30) + vga_ansi[fg], 40 + vga_ansi[bg]);
+    int fg = attr & 7, bright = attr & 8, bg = (attr >> 4) & 7, blink = attr & 0x80;
+    int n = snprintf(tmp, sizeof tmp, "\x1b[0;%s%d;%dm", blink ? "5;" : "", (bright ? 90 : 30) + vga_ansi[fg],
+                     40 + vga_ansi[bg]);
     fb(tmp, (size_t)n);
 }
 
@@ -94,16 +101,44 @@ static void t_begin(void *user, int w, int h)
     fbs("\x1b[H");
 }
 
+static int locale_is_utf8(void)
+{
+    const char *v = getenv("LC_ALL");
+    if (!v || !*v) v = getenv("LC_CTYPE");
+    if (!v || !*v) v = getenv("LANG");
+    if (!v) return 0;
+    for (; *v; v++)
+        if ((v[0] == 'U' || v[0] == 'u') && (v[1] == 'T' || v[1] == 't') && (v[2] == 'F' || v[2] == 'f'))
+            return 1;
+    return 0;
+}
+
+static char ascii_of(unsigned char c)
+{
+    uint32_t u = glyph_cp437_unicode(c);
+    if (c >= 0x20 && c <= 0x7E) return (char)c;
+    if (u == 0x2500 || u == 0x2550) return '-';                     /* ─ ═ */
+    if (u == 0x2502 || u == 0x2551) return '|';                     /* │ ║ */
+    if (u >= 0x2500 && u <= 0x257F) return '+';                     /* corners, joins */
+    if (u == 0x2591 || u == 0x2592) return ':';                     /* ░ ▒ */
+    if (u == 0x2593 || (u >= 0x2580 && u <= 0x2590)) return '#';    /* ▓ █ ▀ ▄ ▌ ▐ */
+    if (u == 0x25BA || u == 0x2192) return '>';
+    if (u == 0x25C4 || u == 0x2190) return '<';
+    if (u == 0x00B7 || u == 0x2219 || u == 0x2022) return '.';
+    if (u == 0x0020 || u == 0x00A0) return ' ';
+    return '?';
+}
+
 static void t_row(void *user, int y, const glyph_cell *cells, int w)
 {
     int x, cur = -1;
     (void)user; (void)y;
     for (x = 0; x < w; x++) {
         int a = GLYPH_CELL_ATTR(cells[x]);
-        char c = (char)GLYPH_CELL_CH(cells[x]);
+        char u[4];
         if (a != cur) { sgr(a); cur = a; }
-        if (c < 0x20 || c > 0x7E) c = '?';
-        fb(&c, 1);
+        if (utf8_ok) fb(u, (size_t)glyph_cp437_utf8(GLYPH_CELL_CH(cells[x]), u));   /* CP437 -> UTF-8 */
+        else { u[0] = ascii_of(GLYPH_CELL_CH(cells[x])); fb(u, 1); }
     }
     fbs("\x1b[0m\x1b[K\r\n");
 }
@@ -111,7 +146,7 @@ static void t_row(void *user, int y, const glyph_cell *cells, int w)
 static void t_status(void *user, const char *text, int len)
 {
     (void)user;
-    fbs("\x1b[7m");
+    sgr(GLYPH_ATTR_STATUS);
     fb(text, (size_t)len);
     /* No newline: an 80x24 frame plus this line exactly fills an 80x25
      * terminal, and a newline here would scroll it every frame. */

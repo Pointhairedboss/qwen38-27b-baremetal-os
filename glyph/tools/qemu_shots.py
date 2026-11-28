@@ -75,8 +75,21 @@ with tempfile.TemporaryDirectory() as tmp:
     vm.shot("vm-02-turing-halted")
     vm.keys("esc")                                        # leave the app: menu
     vm.shot("vm-03-menu")
-    vm.keys("6")                                          # rule110
+    vm.keys("7")                                          # rule110
     vm.shot("vm-04-rule110")
+    vm.close()
+
+with tempfile.TemporaryDirectory() as tmp:
+    vm = VM("app=adder", tmp)
+    vm.keys("1", "2", "tab", "3", "0", "ret")             # 12 + 30
+    vm.shot("vm-06-adder")
+    vm.keys("tab", "tab", "tab", "backspace", "backspace", "t", "e", "n", "ret")
+    vm.shot("vm-07-adder-letters")
+    vm.close()
+
+with tempfile.TemporaryDirectory() as tmp:
+    vm = VM("app=drawing", tmp)
+    vm.shot("vm-08-drawing")
     vm.close()
 
 with tempfile.TemporaryDirectory() as tmp:

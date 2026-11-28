@@ -51,14 +51,23 @@ ON down IF :count > 0 [ADD count -1]
 ```
 
 ```
-+ Counter -----------------------+
-|                                |
-| Count: 2                       |
-|                                |
-| > -1 < [ +1 ]                  |
-|                                |
-+--------------------------------+
+╔ Counter ═══════════════════════╗
+║                                ║
+║ Count: 2                       ║
+║                                ║
+║ ▐►-1◄▌ ▐ +1 ▌                  ║
+║                                ║
+╚════════════════════════════════╝
 ```
+
+Programs are drawn as a 1990s-style text UI, using the VGA text mode's own line,
+block and shade characters (SPEC §8.1):
+- windows have double frames and shadows;
+- a panel inside a panel is a group;
+- buttons and fields are coloured, and the focused control is marked.
+
+The program needs nothing extra for this look, and string literals may use
+Unicode characters such as `═ ♥ ░▒▓█`.
 
 ## Screenshots
 
@@ -94,14 +103,14 @@ built in. It does not include the Qwen inference engine.
 ```sh
 make qemu-run APP=turing                         # VGA window; ESC opens a menu, ESC again powers off
 make qemu-run QEMU_DISPLAY='-display curses'     # the same in a terminal
-make qemu-test                                   # bare-metal conformance: 55 transcripts vs the host
+make qemu-test                                   # bare-metal conformance: 57 transcripts vs the host
 make vm-screenshots                              # VGA screenshots via QEMU sendkey/screendump
 ```
 
-Under QEMU 8.2 (software emulation, no KVM) it boots in under a second. All **55
-transcripts are byte-identical** to the Linux host's, on a CPU with AVX and on
-one without. Keys reach Glyph as PS/2 scancodes through the kernel's own keyboard
-driver, and the screen is the kernel's VGA text driver:
+Under QEMU 8.2 (software emulation, no KVM) it boots in under a second. All **57
+transcripts are byte-identical** to the Linux host's. Keys reach Glyph as PS/2
+scancodes through the kernel's own keyboard driver, and the screen is VGA text
+memory, centred on a shaded desktop:
 
 ![Glyph's Turing machine on the bare-metal boot path in QEMU, halted after 107 steps](docs/screenshots/vm-02-turing-halted.png)
 
@@ -109,6 +118,8 @@ driver, and the screen is the kernel's VGA text driver:
 |---|---|
 | ![UI demo in QEMU after typing a name](docs/screenshots/vm-05-demo.png) | ![Kernel menu of the built-in programs](docs/screenshots/vm-03-menu.png) |
 | UI demo in QEMU, keys sent as PS/2 scancodes | The kernel's program menu (ESC from an app) |
+| ![The adder: 12 + 30 = 42](docs/screenshots/vm-06-adder.png) | ![The adder after typing letters](docs/screenshots/vm-07-adder-letters.png) |
+| `examples/adder.glyph`: two fields, 12 + 30 = 42 | Letters give a message, not an error (`NUMBERP`) |
 
 ### Inside the Qwen inference kernel
 
@@ -225,7 +236,7 @@ make check-all       # everything except fuzz
 | `include/glyph.h` | Core API: load, start, inputs, render, state introspection |
 | `include/glyph_backend.h` | Backend interface, shared runner, conformance harness |
 | `include/glyph_limits.h` | Every resource limit |
-| `src/core/` | Shared core: `lex`, `parse` (compiler to bytecode), `exec` (stack VM), `turtle`, `ui`, `runner`, `script`, `extract` (programs out of model replies), `util` |
+| `src/core/` | Shared core: `lex`, `parse` (compiler to bytecode), `exec` (stack VM), `turtle` (and line joins), `ui` (components and the default look), `runner`, `script`, `extract` (programs out of model replies), `cp437` (VGA characters and Unicode), `util` |
 | `src/host/` | Linux CLI (`main.c`) and terminal backend (`term.c`) |
 | `src/baremetal/` | Bare-metal adapter (`glyph_bm.c`), stack-aligning NASM shims, `glyph_os.c` (`kernel_main` of the bootable Glyph kernel), the inference-kernel REPL hook (`glyph_repl.c`), the `/draw` loop (`glyph_draw.c`) and its model-text helper (`glyph_model.asm`) |
 | `tests/unit.c` | Unit tests, one section per required category |
@@ -233,6 +244,7 @@ make check-all       # everything except fuzz
 | `tests/fuzz.c` | libFuzzer target (program + event script) |
 | `tests/kernel_link.sh` | Kernel link check for Phase 2 and Phase 4 |
 | `tests/reference/check_tc.py` | Independent Python checks of the Turing machine, Rule 110 and recursion results |
+| `tests/cp437_check.py`, `tests/boxjoin_check.py` | The character table checked against Python's cp437 codec, and the line-join table against Unicode names |
 | `tests/qemu_conformance.py` | Boots the Glyph kernel in QEMU and compares its COM1 transcripts with the host's |
 | `tests/qemu_inference_glyph.py`, `tests/qemu_draw.py` | Boot the inference kernel with the real model in QEMU: `/glyph`, `/glyphtest`, `/draw` against the Linux build (`tests/qemu_kernel.py` is the shared harness) |
 | `tests/model-output/` | Sample model replies, used as fuzz seeds for `glyph_extract` |
@@ -254,10 +266,11 @@ make check-all       # everything except fuzz
 | `examples/rule110.glyph` | Rule 110, the Turing-complete cellular automaton, for 24 generations |
 | `examples/tree.glyph` | Classic LOGO recursion: a binary tree, `fib 20`, `12!` |
 | `examples/demo.glyph` | **The interactive UI demo.** A counter, a name field with live greeting, Lock/Unlock (ENABLE/DISABLE) and a turtle emblem redrawn by procedures on each Spin. |
+| `examples/adder.glyph` | Two input fields added with `NUMBER`, checked with `NUMBERP` |
 | `examples/counter.glyph` | Buttons, a bound label and state |
 | `examples/form.glyph` | Two fields, a submit button and a status label |
 | `examples/spiral.glyph` | Pure LOGO: procedures, nested REPEAT |
-| `examples/drawing.glyph` | TEXT, LINE, RECT, BOX and colours |
+| `examples/drawing.glyph` | TEXT, LINE, RECT, BOX (box-drawing lines) and colours |
 | `examples/hello.glyph` | Minimal program |
 
 ## Status

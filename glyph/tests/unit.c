@@ -52,8 +52,29 @@ static void grab_row(void *u, int y, const glyph_cell *cells, int w)
 
 static void render(void) { memset(grid, 0, sizeof grid); glyph_render(&vm, grab_row, 0); }
 
-/* Rendered text of row y from column x, length n. */
-static int row_is(int y, int x, const char *s) { render(); return strncmp(&grid[y][x], s, strlen(s)) == 0; }
+/* Row y of the last render from column x, as UTF-8 (cells are CP437). */
+static const char *utf8_row(int y, int x)
+{
+    static char out[GLYPH_MAX_W * 3 + 1];
+    int n = 0, i, len = (int)strlen(grid[y]);
+    for (i = x; i < len; i++) n += glyph_cp437_utf8((unsigned char)grid[y][i], out + n);
+    out[n] = 0;
+    return out;
+}
+
+/* Rendered text of row y from column x starts with the UTF-8 string s. */
+static int row_is(int y, int x, const char *s) { render(); return strncmp(utf8_row(y, x), s, strlen(s)) == 0; }
+
+/* Row y (already rendered) is exactly s. */
+static int row_eq(int y, const char *s) { return strcmp(utf8_row(y, 0), s) == 0; }
+
+/* The canvas cell at (x, y) shows the UTF-8 character s. */
+static int cell_is(int x, int y, const char *s)
+{
+    char u[5];
+    u[glyph_cp437_utf8(GLYPH_CELL_CH(glyph_canvas_cell(&vm, x, y)), u)] = 0;
+    return strcmp(u, s) == 0;
+}
 
 static char canvas_ch(int x, int y) { return (char)GLYPH_CELL_CH(glyph_canvas_cell(&vm, x, y)); }
 
@@ -123,7 +144,20 @@ TEST(lex_bad_characters_and_positions)
 {
     CHECK_CODE(load("FD 1\nRT 2 @"), GLYPH_E_CHAR);
     CHECK_EQ(diag.line, 2); CHECK_EQ(diag.col, 6);
-    CHECK_CODE(load("TEXT 0 0 \"caf\xc3\xa9\""), GLYPH_E_CHAR);
+    /* strings take UTF-8; it becomes CP437 (VGA) characters */
+    CHECK_CODE(run("TEXT 0 0 \"caf\xc3\xa9 \xe2\x99\xa5 \xf0\x9f\x98\x80\""), GLYPH_OK);   /* café ♥ 😀 */
+    CHECK_EQ((unsigned char)canvas_ch(3, 0), 0x82);                 /* é */
+    CHECK_EQ((unsigned char)canvas_ch(5, 0), 0x03);                 /* ♥ */
+    CHECK_EQ((unsigned char)canvas_ch(7, 0), '?');                  /* no VGA glyph for emoji */
+    CHECK_CODE(load("TEXT 0 0 \"\xff\""), GLYPH_E_CHAR);             /* not UTF-8 */
+    CHECK_CODE(load("TEXT 0 0 \"\xe2\x94\""), GLYPH_E_CHAR);         /* truncated */
+    CHECK_CODE(load("TEXT 0 0 \"\xc0\xaf\""), GLYPH_E_CHAR);         /* overlong */
+    CHECK_CODE(load("TEXT 0 0 \"\xe0\x80\xaf\""), GLYPH_E_CHAR);     /* overlong */
+    CHECK_CODE(load("TEXT 0 0 \"\xed\xa0\x80\""), GLYPH_E_CHAR);     /* surrogate */
+    CHECK_CODE(load("TEXT 0 0 \"\xf4\x90\x80\x80\""), GLYPH_E_CHAR); /* above U+10FFFF */
+    CHECK_CODE(load("TEXT 0 0 \"\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88"
+                    "\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88"
+                    "\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\""), GLYPH_OK);  /* 22 chars, 66 bytes */
     CHECK_CODE(load("FD 1 ; caf\xc3\xa9 \xe2\x80\x94 ok in a comment\nFD 2"), GLYPH_OK);
     CHECK_CODE(load("FD 1 ; bell \x07 is not"), GLYPH_E_CHAR);
     {
@@ -332,8 +366,8 @@ TEST(drawing_text_line)
     CHECK(row_is(2, 18, "ab"));
     CHECK_EQ(strlen(grid[2]), 20);
     CHECK_CODE(run("SCREEN 20 8 LINE 1 1 5 1 LINE 0 2 0 5 LINE 2 3 4 5 LINE 9 3 7 5 LINE 10 0 13 1"), GLYPH_OK);
-    CHECK(row_is(1, 1, "-----"));
-    CHECK(canvas_ch(0, 2) == '|' && canvas_ch(0, 5) == '|');
+    CHECK(row_is(1, 1, "─────"));
+    CHECK(cell_is(0, 2, "│") && cell_is(0, 5, "│"));
     CHECK(canvas_ch(2, 3) == '\\' && canvas_ch(3, 4) == '\\' && canvas_ch(4, 5) == '\\');
     CHECK(canvas_ch(9, 3) == '/' && canvas_ch(7, 5) == '/');
     /* Bresenham (10,0)-(13,1): 4 cells, '*' */
@@ -348,9 +382,9 @@ TEST(drawing_rect_box_clear)
     CHECK_EQ(GLYPH_CELL_ATTR(glyph_canvas_cell(&vm, 0, 0)), 0x4F);
     CHECK_EQ(GLYPH_CELL_ATTR(glyph_canvas_cell(&vm, 1, 1)), 0x4F);
     CHECK_EQ(GLYPH_CELL_ATTR(glyph_canvas_cell(&vm, 2, 2)), 0x07);
-    CHECK(row_is(1, 3, "+--+"));
-    CHECK(row_is(2, 3, "|  |"));
-    CHECK(row_is(3, 3, "+--+"));
+    CHECK(row_is(1, 3, "┌──┐"));
+    CHECK(row_is(2, 3, "│  │"));
+    CHECK(row_is(3, 3, "└──┘"));
     CHECK_CODE(run("SCREEN 10 6 FD 2 COLOR 0 2 CLEAR"), GLYPH_OK);
     turtle(&x, &y, &h, &p);
     CHECK_EQ(y, 1);
@@ -360,6 +394,59 @@ TEST(drawing_rect_box_clear)
     CHECK_CODE(run("TEXT 1001 0 \"x\""), GLYPH_E_RANGE);
     CHECK_CODE(run("LINE 0 0 0 -1001"), GLYPH_E_RANGE);
     CHECK_CODE(run("RECT 0 0 -1 3"), GLYPH_E_RANGE);
+}
+
+TEST(drawing_line_joins)
+{
+    /* crossing lines, a line meeting a box, two boxes sharing an edge */
+    CHECK_CODE(run("SCREEN 20 8 LINE 0 2 10 2 LINE 5 0 5 4"), GLYPH_OK);
+    CHECK(cell_is(5, 2, "┼") && cell_is(5, 0, "│") && cell_is(4, 2, "─"));
+    CHECK_CODE(run("SCREEN 20 8 BOX 0 0 6 4 LINE 0 2 3 2"), GLYPH_OK);
+    CHECK(cell_is(0, 2, "├") && cell_is(1, 2, "─") && cell_is(3, 2, "─"));
+    CHECK_CODE(run("SCREEN 20 8 BOX 0 0 5 3 BOX 4 0 5 3"), GLYPH_OK);
+    CHECK(cell_is(4, 0, "┬") && cell_is(4, 1, "│") && cell_is(4, 2, "┴"));
+    CHECK(cell_is(0, 0, "┌") && cell_is(8, 2, "┘"));
+    CHECK_CODE(run("SCREEN 20 8 BOX 0 0 5 5 BOX 2 2 5 5"), GLYPH_OK);   /* overlapping boxes */
+    CHECK(cell_is(4, 2, "┼") && cell_is(2, 4, "┼"));             /* the two crossings */
+    CHECK(cell_is(4, 4, "┘") && cell_is(2, 2, "┌"));             /* corners inside the other box */
+    /* text over a line replaces it; a line over text replaces the text */
+    CHECK_CODE(run("SCREEN 20 8 LINE 0 0 9 0 TEXT 3 0 \"x\" LINE 2 1 2 0"), GLYPH_OK);
+    CHECK(cell_is(3, 0, "x") && cell_is(2, 0, "┬"));
+    /* one-cell lines */
+    CHECK_CODE(run("SCREEN 20 8 LINE 4 4 4 4"), GLYPH_OK);
+    CHECK(cell_is(4, 4, "─"));
+}
+
+TEST(number_reporters)
+{
+    CHECK_CODE(run("SET a NUMBER \" -42 \" SET b NUMBER 7 SET c NUMBER \"+30\" "
+                   "SET d NUMBER \"99999999999\" SET e NUMBER \"-99999999999\" "
+                   "SET f (NUMBER \"12\") + (NUMBER \"30\")"), GLYPH_OK);
+    CHECK_EQ(sint("a"), -42);
+    CHECK_EQ(sint("b"), 7);
+    CHECK_EQ(sint("c"), 30);
+    CHECK_EQ(sint("d"), 999999999);                    /* saturates, like arithmetic */
+    CHECK_EQ(sint("e"), -999999999);
+    CHECK_EQ(sint("f"), 42);
+    CHECK_CODE(run("SET p NUMBERP \"12\" SET q NUMBERP \"4x\" SET r NUMBERP \"\" SET s NUMBERP 5 "
+                   "SET t NUMBERP \"-\" SET u NUMBERP \" 7 \" SET v NUMBERP \"1 2\""), GLYPH_OK);
+    CHECK_EQ(sint("p"), 1);
+    CHECK_EQ(sint("q"), 0);
+    CHECK_EQ(sint("r"), 0);
+    CHECK_EQ(sint("s"), 1);
+    CHECK_EQ(sint("t"), 0);
+    CHECK_EQ(sint("u"), 1);
+    CHECK_EQ(sint("v"), 0);
+    CHECK_CODE(run("SET a NUMBER \"ten\""), GLYPH_E_TYPE);
+    CHECK(strstr(res.diag.msg, "\"ten\" is not a number") != 0);
+    CHECK_CODE(load("SET number 1"), GLYPH_E_SYNTAX);  /* reserved word */
+    /* the adder: field text (a string) to a sum */
+    CHECK_CODE(run("FIELD a 0 0 6 go FIELD b 0 1 6 go SET sum 0 "
+                   "ON go [IF AND NUMBERP :a NUMBERP :b [SET sum (NUMBER :a) + (NUMBER :b)]]"), GLYPH_OK);
+    glyph_key(&vm, '1', &res); glyph_key(&vm, '2', &res); glyph_key(&vm, GLYPH_KEY_TAB, &res);
+    glyph_key(&vm, '3', &res); glyph_key(&vm, '0', &res);
+    CHECK_CODE(glyph_key(&vm, GLYPH_KEY_LF, &res), GLYPH_OK);
+    CHECK_EQ(sint("sum"), 42);
 }
 
 /* ---- 5. layout ---------------------------------------------------------------- */
@@ -374,23 +461,37 @@ TEST(layout_components)
                    "ON save PU\n"
                    "DISABLE no\n"), GLYPH_OK);
     render();
-    CHECK(strcmp(grid[0], "+ Settings ------------------+") == 0);
-    CHECK(strcmp(grid[1], "| Name: >______<             |") == 0);
-    CHECK(strcmp(grid[3], "| [ OK ] ( Cancel )          |") == 0);
-    CHECK(strcmp(grid[5], "+----------------------------+") == 0);
+    CHECK(row_eq(0, "╔ Settings ══════════════════╗"));
+    CHECK(row_eq(1, "║ Name: ►_·····◄             ║"));    /* focused field, blinking cursor */
+    CHECK(row_eq(3, "║ ▐ OK ▌ ░ Cancel ░          ║"));    /* button; disabled button */
+    CHECK(row_eq(5, "╚════════════════════════════╝"));
     CHECK_EQ(gattr[0][0], GLYPH_ATTR_PANEL);
     CHECK_EQ(gattr[0][2], GLYPH_ATTR_TITLE);
-    CHECK_EQ(gattr[1][8], GLYPH_ATTR_FOCUS);
-    CHECK_EQ(gattr[3][2], GLYPH_ATTR_CONTROL);
-    CHECK_EQ(gattr[3][9], GLYPH_ATTR_DISABLED);
+    CHECK_EQ(gattr[2][5], GLYPH_ATTR_BODY);                      /* panel interior */
+    CHECK_EQ(gattr[1][2], 0x1F);                                 /* label: white on the panel's blue */
+    CHECK_EQ(gattr[1][8], 0x1E);                                 /* focus marker: yellow on blue */
+    CHECK_EQ(gattr[1][9], GLYPH_ATTR_CURSOR);
+    CHECK_EQ(gattr[1][10], GLYPH_ATTR_FIELD);
+    CHECK_EQ(gattr[3][2], 0x13);                                 /* half-block edge: cyan on blue */
+    CHECK_EQ(gattr[3][3], GLYPH_ATTR_CONTROL);
+    CHECK_EQ(gattr[3][9], 0x18);                                 /* disabled edge */
+    CHECK_EQ(gattr[3][10], GLYPH_ATTR_DISABLED);
 }
 
 TEST(layout_title_truncation_and_clipping)
 {
     CHECK_CODE(run("SCREEN 12 3 PANEL p 0 0 8 3 \"Very long title\" BUTTON b 9 1 \"Wide\" go ON go PU"), GLYPH_OK);
     render();
-    CHECK(strncmp(grid[0], "+ Very +", 8) == 0);
-    CHECK(strcmp(grid[1], "|      | > W") == 0);   /* button clipped at the right edge */
+    CHECK(row_eq(0, "╔ Very ╗    "));
+    CHECK(row_eq(1, "║      ║ ▐►W"));                  /* button clipped at the right edge */
+    CHECK_EQ(gattr[1][8], GLYPH_ATTR_SHADOW);            /* window shadow, two cells wide */
+    CHECK_EQ(gattr[2][2], GLYPH_ATTR_PANEL);
+    CHECK_CODE(run("SCREEN 20 8 PANEL w 0 0 20 8 \"Win\" PANEL g 2 2 8 4 \"Grp\""), GLYPH_OK);
+    render();
+    CHECK(row_eq(2, "║ ┌ Grp ─┐         ║"));             /* a panel inside a panel is a group */
+    CHECK(row_eq(5, "║ └──────┘         ║"));
+    CHECK_EQ(gattr[3][10], GLYPH_ATTR_BODY);             /* groups cast no shadow */
+    CHECK_EQ(gattr[6][4], GLYPH_ATTR_BODY);
 }
 
 TEST(layout_errors)
@@ -494,11 +595,11 @@ TEST(fields)
     CHECK(strcmp(sstr("name"), "Bo b!") == 0);
     CHECK_CODE(glyph_key(&vm, '?', &res), GLYPH_IGNORED);  /* width 5 reached */
     CHECK(row_is(0, 0, "Bo b!"));                       /* bound label */
-    CHECK(row_is(1, 0, ">Bo b!<"));
+    CHECK(row_is(1, 0, "►Bo b!◄"));                   /* full: no cursor */
     CHECK_CODE(glyph_key(&vm, GLYPH_KEY_BS, &res), GLYPH_OK);
     CHECK_CODE(glyph_key(&vm, GLYPH_KEY_DEL, &res), GLYPH_OK);
     CHECK(strcmp(sstr("name"), "Bo ") == 0);
-    CHECK(row_is(1, 0, ">Bo __<"));
+    CHECK(row_is(1, 0, "►Bo _·◄"));
     CHECK_CODE(glyph_key(&vm, GLYPH_KEY_LF, &res), GLYPH_OK);
     CHECK_EQ(sint("count"), 100);
     glyph_key(&vm, GLYPH_KEY_BS, &res); glyph_key(&vm, GLYPH_KEY_BS, &res); glyph_key(&vm, GLYPH_KEY_BS, &res);
@@ -510,7 +611,7 @@ TEST(fields)
 TEST(field_holding_number)
 {
     CHECK_CODE(run("FIELD f 0 0 6 go ON go PU SET f 42"), GLYPH_OK);
-    CHECK(row_is(0, 0, ">42____<"));
+    CHECK(row_is(0, 0, "►42_···◄"));
     CHECK_CODE(glyph_key(&vm, '7', &res), GLYPH_OK);
     CHECK(strcmp(sstr("f"), "427") == 0);
     CHECK_EQ(glyph_state_type(&vm, glyph_state_find(&vm, "f")), GLYPH_T_STR);
@@ -531,7 +632,7 @@ TEST(clicks_and_disable)
     CHECK_EQ(res.focus, 1);                                         /* moved to the field */
     CHECK(!glyph_comp_enabled(&vm, 2) && !glyph_comp_enabled(&vm, 3));
     CHECK_CODE(glyph_click(&vm, "inc", &res), GLYPH_IGNORED);
-    CHECK(row_is(3, 0, "( + ) ( off )"));
+    CHECK(row_is(3, 0, "░ + ░ ░ off ░"));
     CHECK_CODE(glyph_key(&vm, GLYPH_KEY_TAB, &res), GLYPH_OK);    /* only the field is left */
     CHECK_EQ(res.focus, 1);
 }
@@ -1096,6 +1197,8 @@ int main(void)
     RUN(procedure_depth);
     RUN(drawing_text_line);
     RUN(drawing_rect_box_clear);
+    RUN(drawing_line_joins);
+    RUN(number_reporters);
     RUN(layout_components);
     RUN(layout_title_truncation_and_clipping);
     RUN(layout_errors);

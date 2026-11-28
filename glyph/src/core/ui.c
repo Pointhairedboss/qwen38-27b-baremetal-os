@@ -271,15 +271,123 @@ int glyph_action(glyph_vm *vm, const char *name, glyph_result *r)
 }
 
 /* ---- rendering ----------------------------------------------------------------- */
-static void row_put(glyph_vm *vm, int x, char ch, uint8_t attr)
+/* CP437 codes used by the default look */
+#define CH_DH   0xCD   /* ═ */
+#define CH_DV   0xBA   /* ║ */
+#define CH_DTL  0xC9   /* ╔ */
+#define CH_DTR  0xBB   /* ╗ */
+#define CH_DBL  0xC8   /* ╚ */
+#define CH_DBR  0xBC   /* ╝ */
+#define CH_SH   0xC4   /* ─ */
+#define CH_SV   0xB3   /* │ */
+#define CH_STL  0xDA   /* ┌ */
+#define CH_STR  0xBF   /* ┐ */
+#define CH_SBL  0xC0   /* └ */
+#define CH_SBR  0xD9   /* ┘ */
+#define CH_LHALF 0xDD  /* ▌ */
+#define CH_RHALF 0xDE  /* ▐ */
+#define CH_SHADE 0xB0  /* ░ */
+#define CH_RIGHT 0x10  /* ► */
+#define CH_LEFT  0x11  /* ◄ */
+#define CH_DOT   0xFA  /* · */
+
+static void row_put(glyph_vm *vm, int x, unsigned char ch, uint8_t attr)
 {
     if (x >= 0 && x < vm->w) vm->row[x] = GLYPH_CELL(ch, attr);
+}
+
+static uint8_t row_bg(const glyph_vm *vm, int x)
+{
+    return (x >= 0 && x < vm->w) ? (uint8_t)(GLYPH_CELL_ATTR(vm->row[x]) & 0x70) : 0;
 }
 
 static void row_text(glyph_vm *vm, int x, const char *s, int n, uint8_t attr)
 {
     int i;
-    for (i = 0; i < n; i++) row_put(vm, x + i, s[i], attr);
+    for (i = 0; i < n; i++) row_put(vm, x + i, (unsigned char)s[i], attr);
+}
+
+/* Text in fg over whatever background is already there (panel or canvas). */
+static void row_text_fg(glyph_vm *vm, int x, const char *s, int n, uint8_t fg)
+{
+    int i;
+    for (i = 0; i < n; i++) row_put(vm, x + i, (unsigned char)s[i], (uint8_t)(row_bg(vm, x + i) | fg));
+}
+
+/* A half-block edge in colour col over the current background. */
+static void row_edge(glyph_vm *vm, int x, unsigned char ch, uint8_t col)
+{
+    row_put(vm, x, ch, (uint8_t)(row_bg(vm, x) | (col & 0x0F)));
+}
+
+/* Drop shadow: keep the character, darken it. */
+static void row_shadow(glyph_vm *vm, int x)
+{
+    if (x >= 0 && x < vm->w) vm->row[x] = GLYPH_CELL(GLYPH_CELL_CH(vm->row[x]), GLYPH_ATTR_SHADOW);
+}
+
+/* Panel interior: blanks take the panel colour; drawings keep their
+ * character and foreground on the panel's blue. */
+static void row_body(glyph_vm *vm, int x)
+{
+    glyph_cell c;
+    uint8_t a;
+    if (x < 0 || x >= vm->w) return;
+    c = vm->row[x];
+    a = GLYPH_CELL_ATTR(c);
+    if (GLYPH_CELL_CH(c) == ' ') { vm->row[x] = GLYPH_CELL(' ', GLYPH_ATTR_BODY); return; }
+    if ((a & 0x70) == 0) {
+        a = (uint8_t)((a & 0x0F) | (GLYPH_ATTR_BODY & 0x70));
+        if ((a & 0x07) == ((GLYPH_ATTR_BODY >> 4) & 0x07)) a = (uint8_t)((a & 0xF0) | 0x0F);   /* blue on blue */
+        vm->row[x] = GLYPH_CELL(GLYPH_CELL_CH(c), a);
+    }
+}
+
+/* A panel inside another panel is a group: single frame, no shadow. A
+ * top-level panel is a window: double frame and a drop shadow. */
+static int panel_nested(const glyph_vm *vm, int ci)
+{
+    const glyph_comp *c = &vm->comps[ci];
+    int j;
+    for (j = 0; j < vm->n_comps; j++) {
+        const glyph_comp *p = &vm->comps[j];
+        if (j == ci || p->type != GLYPH_COMP_PANEL) continue;
+        if (p->x <= c->x && p->y <= c->y && p->x + p->w >= c->x + c->w && p->y + p->h >= c->y + c->h &&
+            (p->x != c->x || p->y != c->y || p->w != c->w || p->h != c->h || j < ci))
+            return 1;
+    }
+    return 0;
+}
+
+static void draw_panel_row(glyph_vm *vm, int ci, int y)
+{
+    const glyph_comp *c = &vm->comps[ci];
+    int x2 = c->x + c->w - 1, y2 = c->y + c->h - 1, i, group;
+    if (y < c->y || y > y2 + 1) return;
+    group = panel_nested(vm, ci);
+    if (y == y2 + 1) {                                  /* shadow below, offset by 2 */
+        if (!group) for (i = c->x + 2; i <= x2 + 2; i++) row_shadow(vm, i);
+        return;
+    }
+    if (y == c->y || y == y2) {
+        for (i = c->x + 1; i < x2; i++) row_put(vm, i, group ? CH_SH : CH_DH, GLYPH_ATTR_PANEL);
+        row_put(vm, c->x, y == c->y ? (group ? CH_STL : CH_DTL) : (group ? CH_SBL : CH_DBL), GLYPH_ATTR_PANEL);
+        row_put(vm, x2, y == c->y ? (group ? CH_STR : CH_DTR) : (group ? CH_SBR : CH_DBR), GLYPH_ATTR_PANEL);
+        if (y == c->y && c->text_len > 0) {
+            int room = c->w - 4, n = c->text_len;
+            if (room > 0) {
+                if (n > room) n = room;
+                row_put(vm, c->x + 1, ' ', GLYPH_ATTR_TITLE);
+                row_text(vm, c->x + 2, &vm->strpool[c->text], n, GLYPH_ATTR_TITLE);
+                row_put(vm, c->x + 2 + n, ' ', GLYPH_ATTR_TITLE);
+            }
+        }
+    } else {
+        for (i = c->x + 1; i < x2; i++) row_body(vm, i);
+        row_put(vm, c->x, group ? CH_SV : CH_DV, GLYPH_ATTR_PANEL);
+        row_put(vm, x2, group ? CH_SV : CH_DV, GLYPH_ATTR_PANEL);
+    }
+    if (y > c->y && !group) { row_shadow(vm, x2 + 1); row_shadow(vm, x2 + 2); }   /* shadow at the right */
 }
 
 static void draw_comp_row(glyph_vm *vm, int ci, int y)
@@ -287,65 +395,57 @@ static void draw_comp_row(glyph_vm *vm, int ci, int y)
     const glyph_comp *c = &vm->comps[ci];
     char buf[GLYPH_MAX_STR_LEN + 2];
     int i;
-    if (c->type == GLYPH_COMP_PANEL) {
-        int x2 = c->x + c->w - 1, y2 = c->y + c->h - 1;
-        if (y < c->y || y > y2) return;
-        if (y == c->y || y == y2) {
-            for (i = c->x + 1; i < x2; i++) row_put(vm, i, '-', GLYPH_ATTR_PANEL);
-            row_put(vm, c->x, '+', GLYPH_ATTR_PANEL);
-            row_put(vm, x2, '+', GLYPH_ATTR_PANEL);
-            if (y == c->y && c->text_len > 0) {
-                int room = c->w - 4, n = c->text_len;
-                if (room > 0) {
-                    if (n > room) n = room;
-                    row_put(vm, c->x + 1, ' ', GLYPH_ATTR_TITLE);
-                    row_text(vm, c->x + 2, &vm->strpool[c->text], n, GLYPH_ATTR_TITLE);
-                    row_put(vm, c->x + 2 + n, ' ', GLYPH_ATTR_TITLE);
-                }
-            }
-        } else {
-            row_put(vm, c->x, '|', GLYPH_ATTR_PANEL);
-            row_put(vm, x2, '|', GLYPH_ATTR_PANEL);
-        }
-        return;
-    }
+    if (c->type == GLYPH_COMP_PANEL) { draw_panel_row(vm, ci, y); return; }
     if (y != c->y) return;
     if (c->type == GLYPH_COMP_LABEL) {
         int n;
         if (c->bind_kind == K_INT) n = format_int(buf, c->bind);
         else if (c->bind_kind == K_STR) {
             n = (int)STR_LEN(c->bind);
-            row_text(vm, c->x, &vm->strpool[STR_OFF(c->bind)], n, GLYPH_ATTR_LABEL);
+            row_text_fg(vm, c->x, &vm->strpool[STR_OFF(c->bind)], n, GLYPH_ATTR_LABEL);
             return;
         } else {
             const glyph_value *v = &vm->state[vm->syms[c->bind].state].v;
             if (v->type == GLYPH_T_INT) n = format_int(buf, v->i);
-            else if (v->type == GLYPH_T_STR) { row_text(vm, c->x, v->s, v->len, GLYPH_ATTR_LABEL); return; }
+            else if (v->type == GLYPH_T_STR) { row_text_fg(vm, c->x, v->s, v->len, GLYPH_ATTR_LABEL); return; }
             else n = 0;
         }
-        row_text(vm, c->x, buf, n, GLYPH_ATTR_LABEL);
+        row_text_fg(vm, c->x, buf, n, GLYPH_ATTR_LABEL);
+        return;
+    }
+    if (c->type == GLYPH_COMP_BUTTON) {
+        /* normal "▐ OK ▌", focused "▐►OK◄▌", disabled "░ OK ░" */
+        int focused = c->enabled && vm->focus == ci, x = c->x;
+        uint8_t face = !c->enabled ? GLYPH_ATTR_DISABLED : focused ? GLYPH_ATTR_FOCUS : GLYPH_ATTR_CONTROL;
+        if (c->enabled) row_edge(vm, x, CH_RHALF, (uint8_t)(face >> 4));
+        else row_edge(vm, x, CH_SHADE, 0x08);
+        x++;
+        row_put(vm, x++, focused ? CH_RIGHT : ' ', face);
+        row_text(vm, x, &vm->strpool[c->text], c->text_len, face);
+        x += c->text_len;
+        row_put(vm, x++, focused ? CH_LEFT : ' ', face);
+        if (c->enabled) row_edge(vm, x, CH_LHALF, (uint8_t)(face >> 4));
+        else row_edge(vm, x, CH_SHADE, 0x08);
         return;
     }
     {
-        char open = '[', close = ']';
-        uint8_t attr = GLYPH_ATTR_CONTROL;
-        int x = c->x;
-        if (!c->enabled) { open = '('; close = ')'; attr = GLYPH_ATTR_DISABLED; }
-        else if (vm->focus == ci) { open = '>'; close = '<'; attr = GLYPH_ATTR_FOCUS; }
-        row_put(vm, x++, open, attr);
-        if (c->type == GLYPH_COMP_BUTTON) {
-            row_put(vm, x++, ' ', attr);
-            row_text(vm, x, &vm->strpool[c->text], c->text_len, attr);
-            x += c->text_len;
-            row_put(vm, x++, ' ', attr);
-        } else {
-            int width = c->w - 2, n = field_text(vm, c, buf);
-            if (n > width) n = width;
-            row_text(vm, x, buf, n, attr);
-            for (i = n; i < width; i++) row_put(vm, x + i, '_', attr);
-            x += width;
-        }
-        row_put(vm, x, close, attr);
+        /* field: normal "▐text····▌", focused "►text_···◄" (blinking cursor),
+         * disabled "░text····░" */
+        int focused = c->enabled && vm->focus == ci, x = c->x;
+        int width = c->w - 2, n = field_text(vm, c, buf);
+        uint8_t face = c->enabled ? GLYPH_ATTR_FIELD : GLYPH_ATTR_FIELD_OFF;
+        if (n > width) n = width;
+        if (!c->enabled) row_edge(vm, x, CH_SHADE, 0x08);
+        else if (focused) row_edge(vm, x, CH_RIGHT, 0x0E);
+        else row_edge(vm, x, CH_RHALF, (uint8_t)(face >> 4));
+        x++;
+        row_text(vm, x, buf, n, face);
+        for (i = n; i < width; i++)
+            row_put(vm, x + i, (focused && i == n) ? '_' : CH_DOT, (focused && i == n) ? GLYPH_ATTR_CURSOR : face);
+        x += width;
+        if (!c->enabled) row_edge(vm, x, CH_SHADE, 0x08);
+        else if (focused) row_edge(vm, x, CH_LEFT, 0x0E);
+        else row_edge(vm, x, CH_LHALF, (uint8_t)(face >> 4));
     }
 }
 

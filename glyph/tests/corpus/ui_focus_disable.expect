@@ -2,14 +2,14 @@ glyph 0.2
 load: ok code=21 names=8 components=4 state=1 arrays=0 procs=0 handlers=3
 main: ok steps=2 changed=LOCKED focus=A
 @ frame
- 0|> A <[ Lock ]( Unlock )
+ 0|▐►A◄▌▐ Lock ▌░ Unlock ░
  1|
  2|focus moves when a control is disabled
 @ key TAB -> ok focus=LOCK
 @ key TAB -> ok focus=A
 @ click lock -> ok action=DOLOCK steps=4 changed=LOCKED focus=-
 @ frame
- 0|( A )( Lock )[ Unlock ]
+ 0|░ A ░░ Lock ░▐ Unlock ▌
  1|
  2|focus moves when a control is disabled
 @ click a -> ignored focus=-
@@ -17,12 +17,12 @@ main: ok steps=2 changed=LOCKED focus=A
 @ click nobody -> ignored focus=-
 @ key TAB -> ok focus=UNLOCK
 @ frame
- 0|( A )( Lock )> Unlock <
+ 0|░ A ░░ Lock ░▐►Unlock◄▌
  1|
  2|focus moves when a control is disabled
 @ key ENTER -> ok action=DOUNLOCK steps=4 changed=LOCKED focus=A
 @ frame
- 0|> A <[ Lock ]( Unlock )
+ 0|▐►A◄▌▐ Lock ▌░ Unlock ░
  1|
  2|focus moves when a control is disabled
 @ key TAB -> ok focus=LOCK

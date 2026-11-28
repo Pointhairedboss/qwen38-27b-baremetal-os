@@ -8,7 +8,7 @@ main: ok steps=2 changed=COUNT,SAVED focus=INC
 @ frame
  0| 1          0
  1|
- 2| [ +1 ]> -1 <[ big ][ save ]
+ 2| ▐ +1 ▌▐►-1◄▌▐ big ▌▐ save ▌
  3|
  4|
 @ click save -> ok action=STORE steps=1 changed=SAVED focus=SAVE
@@ -22,7 +22,7 @@ main: ok steps=2 changed=COUNT,SAVED focus=INC
 @ frame
  0| 999999998  999999998
  1|
- 2| [ +1 ]> -1 <[ big ][ save ]
+ 2| ▐ +1 ▌▐►-1◄▌▐ big ▌▐ save ▌
  3|
  4|
 end

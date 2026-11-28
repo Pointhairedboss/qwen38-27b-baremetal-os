@@ -7,15 +7,15 @@ main: ok steps=2 changed=STATUS,SENT focus=NAME
 @ key TAB -> ok focus=GO
 @ key ENTER -> ok action=SUBMIT steps=2 changed=STATUS,SENT focus=GO
 @ frame
- 0|+ Register --------------------------------+
- 1||                                          |
- 2|| Name:  [Ada_________________]            |
- 3||                                          |
- 4|| Node:  [p510-a______]                    |
- 5||                                          |
- 6||        > Submit < submitted              |
- 7||                                          |
- 8|+------------------------------------------+
+ 0|╔ Register ════════════════════════════════╗
+ 1|║                                          ║
+ 2|║ Name:  ▐Ada·················▌            ║
+ 3|║                                          ║
+ 4|║ Node:  ▐p510-a······▌                    ║
+ 5|║                                          ║
+ 6|║        ▐►Submit◄▌ submitted              ║
+ 7|║                                          ║
+ 8|╚══════════════════════════════════════════╝
 @ state
   STATUS = "submitted"
   SENT = 1

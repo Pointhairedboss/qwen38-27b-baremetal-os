@@ -1,0 +1,20 @@
+; adder.glyph — type two numbers and add them.
+; Field text is always a string; NUMBER turns it into an integer and
+; NUMBERP checks first, so typing letters gives a message, not an error.
+SCREEN 40 11
+SET result "type two numbers"
+PANEL win 0 0 40 11 "Adder"
+LABEL la 3 2 "First:"
+FIELD a 12 2 14 total
+LABEL lb 3 4 "Second:"
+FIELD b 12 4 14 total
+BUTTON go 12 6 "Add" total
+BUTTON clr 21 6 "Clear" wipe
+LABEL lr 3 8 "Sum:"
+LABEL res 12 8 :result
+ON total [
+  IFELSE AND NUMBERP :a NUMBERP :b
+    [SET result (NUMBER :a) + (NUMBER :b)]
+    [SET result "numbers only, please"]
+]
+ON wipe [SET a "" SET b "" SET result "type two numbers"]

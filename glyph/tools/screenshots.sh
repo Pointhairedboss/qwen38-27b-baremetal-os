@@ -28,7 +28,10 @@ sleep 1
 PAL=(000000 AA0000 00AA00 AA5500 0000AA AA00AA 00AAAA AAAAAA 555555 FF5555 55FF55 FFFF55 5555FF FF55FF 55FFFF FFFFFF)
 XRM=()
 for i in "${!PAL[@]}"; do XRM+=(-xrm "XTerm*color$i: #${PAL[$i]}"); done
-XTERM=(xterm -fa 'DejaVu Sans Mono' -fs 15 -bg black -fg '#AAAAAA' -bw 0 "${XRM[@]}")
+# UTF-8 locale and xterm in UTF-8 mode: cells are CP437 box-drawing and block
+# characters, which glyph writes as UTF-8.
+export LC_ALL=C.UTF-8
+XTERM=(xterm -u8 -fa 'DejaVu Sans Mono' -fs 15 -bg black -fg '#AAAAAA' -bw 0 "${XRM[@]}")
 
 # shot PROGRAM NAME:KEYS...   KEYS are xdotool key names; type=TEXT types text
 shot() {

@@ -16,7 +16,7 @@
 CC       ?= cc
 BUILD    := build
 CORE_SRC := src/core/util.c src/core/lex.c src/core/parse.c src/core/exec.c \
-            src/core/turtle.c src/core/ui.c src/core/runner.c src/core/script.c src/core/extract.c
+            src/core/turtle.c src/core/ui.c src/core/runner.c src/core/script.c src/core/extract.c src/core/cp437.c
 HOST_SRC := src/host/main.c src/host/term.c
 INC      := -Iinclude -Isrc/core
 
@@ -133,6 +133,8 @@ clean:
 # Busy beavers, Rule 110, recursion and the sieve checked against Python.
 reference: $(BUILD)/glyph
 	python3 -I tests/reference/check_tc.py $(BUILD)/glyph
+	python3 -I tests/cp437_check.py
+	python3 -I tests/boxjoin_check.py
 
 # ---- screenshots (Xvfb, xterm, xdotool, ImageMagick) ------------------------
 screenshots: $(BUILD)/glyph

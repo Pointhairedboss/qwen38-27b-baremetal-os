@@ -137,9 +137,9 @@ static void dump_row(void *user, int y, const glyph_cell *cells, int w)
         for (x = 0; x < w; x++) glyph_buf_hex2(dc->b, GLYPH_CELL_ATTR(cells[x]));
     } else {
         while (end > 0 && GLYPH_CELL_CH(cells[end - 1]) == ' ') end--;
-        for (x = 0; x < end; x++) {
-            unsigned char c = GLYPH_CELL_CH(cells[x]);
-            glyph_buf_ch(dc->b, (c >= 0x20 && c <= 0x7E) ? (char)c : '?');
+        for (x = 0; x < end; x++) {                   /* CP437 cells as UTF-8 */
+            char u[4];
+            glyph_buf_mem(dc->b, u, (size_t)glyph_cp437_utf8(GLYPH_CELL_CH(cells[x]), u));
         }
     }
     glyph_buf_ch(dc->b, '\n');
@@ -154,9 +154,13 @@ static void dump_state(glyph_buf *b, const glyph_vm *vm)
         glyph_buf_str(b, " = ");
         switch (glyph_state_type(vm, i)) {
         case GLYPH_T_INT: glyph_buf_int(b, glyph_state_int(vm, i)); break;
-        case GLYPH_T_STR:
-            glyph_buf_ch(b, '"'); glyph_buf_str(b, glyph_state_str(vm, i)); glyph_buf_ch(b, '"');
+        case GLYPH_T_STR: {
+            const char *t = glyph_state_str(vm, i);
+            glyph_buf_ch(b, '"');
+            for (; *t; t++) { char u[4]; glyph_buf_mem(b, u, (size_t)glyph_cp437_utf8((unsigned char)*t, u)); }
+            glyph_buf_ch(b, '"');
             break;
+        }
         default: glyph_buf_str(b, "<unset>");
         }
         glyph_buf_ch(b, '\n');

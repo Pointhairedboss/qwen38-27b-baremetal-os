@@ -56,6 +56,31 @@ static int bad_char(glyph_lexer *lx, glyph_diag *d, int c)
     return GLYPH_E_CHAR;
 }
 
+/* One UTF-8 sequence inside a string literal -> a CP437 code ('?' when VGA
+ * has no such glyph, e.g. emoji). Malformed or overlong sequences, surrogates
+ * and code points above U+10FFFF are errors. Consumes the sequence. Returns
+ * -1 on error. */
+static int utf8_char(glyph_lexer *lx, glyph_diag *d)
+{
+    int c = peekc(lx), need, i, code;
+    uint32_t cp;
+    if (c >= 0xC2 && c <= 0xDF) { need = 1; cp = (uint32_t)(c & 0x1F); }
+    else if (c >= 0xE0 && c <= 0xEF) { need = 2; cp = (uint32_t)(c & 0x0F); }
+    else if (c >= 0xF0 && c <= 0xF4) { need = 3; cp = (uint32_t)(c & 0x07); }
+    else return bad_char(lx, d, c), -1;
+    for (i = 1; i <= need; i++) {
+        int k = lx->pos + i < lx->len ? (unsigned char)lx->src[lx->pos + i] : -1;
+        if (k < 0x80 || k > 0xBF) return bad_char(lx, d, c), -1;
+        cp = (cp << 6) | (uint32_t)(k & 0x3F);
+    }
+    if ((need == 2 && cp < 0x800) || (need == 3 && (cp < 0x10000 || cp > 0x10FFFF)) ||
+        (cp >= 0xD800 && cp <= 0xDFFF))
+        return bad_char(lx, d, c), -1;
+    for (i = 0; i <= need; i++) advance(lx);
+    code = glyph_cp437_from_unicode(cp);
+    return code < 0 ? '?' : code;
+}
+
 /* Read a word into lx->text (upper-cased). */
 static int read_word(glyph_lexer *lx, glyph_diag *d)
 {
@@ -177,11 +202,18 @@ int lex_next(glyph_lexer *lx, glyph_diag *d)
                 return GLYPH_E_STRING;
             }
             if (k == '"') { advance(lx); break; }
-            if (k < 0x20 || k > 0x7E) return bad_char(lx, d, k);
             if (n >= GLYPH_MAX_STR_LEN) {
                 g_diag(d, GLYPH_E_STR_LEN, lx->tline, lx->tcol, "string longer than 63 characters", 0, 0);
                 return GLYPH_E_STR_LEN;
             }
+            if (k >= 0x80) {
+                /* UTF-8: one screen character (CP437); '?' if VGA has no glyph for it */
+                int code = utf8_char(lx, d);
+                if (code < 0) return GLYPH_E_CHAR;
+                lx->text[n++] = (char)code;
+                continue;
+            }
+            if (k < 0x20 || k > 0x7E) return bad_char(lx, d, k);
             lx->text[n++] = (char)k;
             advance(lx);
         }

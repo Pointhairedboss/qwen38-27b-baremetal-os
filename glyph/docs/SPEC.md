@@ -1,4 +1,4 @@
-# Glyph language specification — v0.2
+# Glyph language specification — v0.2 (text-UI look)
 
 Glyph is a small, deterministic, **Turing-complete LOGO** for text-cell interactive
 applications. It keeps the LOGO of [nanochess/bootLogo](https://github.com/nanochess/bootLogo):
@@ -37,16 +37,25 @@ written by drawing commands, with **components** composited on top.
 ## 2. Lexical structure
 
 - Source is ASCII. Allowed bytes are printable `0x20–0x7E`, tab, CR and LF;
-  anything else is `E_CHAR`. The exception is comments, which may also contain
-  `0x80–0xFF`, so UTF-8 in comments is accepted and never rendered.
+  anything else is `E_CHAR`. There are two exceptions:
+  - Comments may also contain `0x80–0xFF`, so UTF-8 in comments is accepted and
+    never rendered.
+  - String literals may contain UTF-8 (see Strings).
 - Whitespace separates tokens; line breaks have no meaning. `;` starts a comment
   that runs to the end of the line.
 - **Words**: `[A-Za-z][A-Za-z0-9_]*`, at most 15 characters, case-insensitive
   (folded to upper case).
 - **Numbers**: decimal integers, −999 999 999 … 999 999 999.
-- **Strings**: `"…"` on one line, printable ASCII except `"`, at most 63
-  characters, no escapes. Case is preserved. **(deviation)** UCBLogo's
-  unterminated `"word` quoting is not used.
+- **Strings**: `"…"` on one line, at most 63 characters, no escapes. Case is
+  preserved. **(deviation)** UCBLogo's unterminated `"word` quoting is not used.
+  - A string may hold printable ASCII except `"`, and UTF-8.
+  - Each UTF-8 character becomes one screen character: the VGA text-mode
+    character set (code page 437, §8.1).
+  - A character VGA has no glyph for, such as an emoji, becomes `?`. So
+    `"═══ ♥ café ░▒▓█"` shows as written, and the 63-character limit counts
+    screen characters.
+  - Malformed UTF-8 (truncated, overlong, a surrogate, or above U+10FFFF) is
+    `E_CHAR`.
 - **Variables**: `:name` reads a variable.
 - **Punctuation**: `[ ] ( )` and the operators `+ - * / = <> < > <= >=`.
 - **Minus** follows UCBLogo's spacing rule. A `-` that follows whitespace, `(`, `[`
@@ -145,6 +154,8 @@ Calls nest at most 64 deep. Recursion is the normal way to write LOGO.
 | `REMAINDER a b` | `a` mod `b` with the sign of `a`; `E_RANGE` if `b` = 0 |
 | `a / b` | Integer division truncating toward zero; `E_RANGE` if `b` = 0 |
 | `WORD a b` | String concatenation (numbers in decimal); `E_RANGE` if over 63 characters |
+| `NUMBER v` | `v` as an integer. `v` is an integer, or a string holding one: optional spaces, an optional sign, decimal digits, optional spaces. Saturates at ±999 999 999. Anything else is `E_TYPE`. Field text is a string, so `(NUMBER :a) + (NUMBER :b)` adds two typed numbers. |
+| `NUMBERP v` | 1 if `NUMBER v` would succeed, else 0 (UCBLogo's name). |
 | `ITEM name i` | Element `i` of an array (1-based); `E_RANGE` outside 1..size |
 | `XCOR`, `YCOR`, `HEADING` | Turtle cell column, cell row, heading in degrees |
 | procedure call | The value the procedure `OUTPUT`s |
@@ -184,9 +195,9 @@ Drawing commands take expression inputs. Coordinates must be within ±1000
 | `CLEAR` | Fill the canvas with spaces in the current colour; the turtle is unchanged. |
 | `COLOR fg bg` | Current colour: `fg` 0–15, `bg` 0–7 (VGA palette). Initially 7 on 0. |
 | `TEXT x y v` | Write a value at (x, y), with no wrapping. |
-| `LINE x1 y1 x2 y2` | Bresenham line including both ends: `-` horizontal, `\|` vertical, `\` or `/` exact diagonal, `*` otherwise. |
+| `LINE x1 y1 x2 y2` | Bresenham line including both ends: `─` horizontal, `│` vertical, `\` or `/` exact diagonal, `*` otherwise. Horizontal and vertical lines join the lines they meet (§8.1). |
 | `RECT x y w h` | Filled area of spaces in the current colour (0 ≤ w, h ≤ 1000). |
-| `BOX x y w h` | Outline with `+ - \|` (2 ≤ w, h ≤ 1000). |
+| `BOX x y w h` | Outline with `┌ ─ ┐ │ └ ┘` (2 ≤ w, h ≤ 1000), joining the lines it meets (§8.1). |
 | `SET name v` | Assign a local or global variable (see §3). |
 | `ADD name n` | Add to an integer variable (saturating). `E_UNSET` if unset, `E_TYPE` if it holds a string. |
 | `SETITEM name i v` | Store integer `v` at index `i` of an array. |
@@ -201,7 +212,7 @@ VGA palette: 0 black, 1 blue, 2 green, 3 cyan, 4 red, 5 magenta, 6 brown, 7 ligh
 | Declaration | Meaning |
 |---|---|
 | `SCREEN w h` | Screen size, 1 ≤ w ≤ 80, 1 ≤ h ≤ 24, at most once. |
-| `PANEL id x y w h "title"` | Bordered box with the title at (x+2, y); transparent interior. |
+| `PANEL id x y w h "title"` | A framed area with the title at (x+2, y). Its interior takes the panel colour; drawings inside it stay visible. A top-level panel is a window: double frame `╔═╗` and a drop shadow. A panel inside another panel is a group: single frame `┌─┐`, no shadow. |
 | `LABEL id x y value` | Text. A `:var` value shows that global's current value at every render. |
 | `BUTTON id x y "caption" action` | Activating it fires `action`. |
 | `FIELD id x y width action` | One-line text input (width 1–63). Its text is the global string variable `id`. ENTER fires `action`. |
@@ -209,8 +220,15 @@ VGA palette: 0 black, 1 blue, 2 green, 3 cyan, 4 red, 5 magenta, 6 brown, 7 ligh
 
 Component origins must lie on the screen (`E_RANGE`); the rest is clipped.
 Components are drawn over the canvas in declaration order. Control state shows in
-the characters as well as the colours: `[ OK ]` normal, `> OK <` focused,
-`( OK )` disabled. Field text is padded with `_`.
+the characters as well as the colours, so it is visible in a transcript:
+
+| | Button | Field |
+|---|---|---|
+| normal | `▐ OK ▌` | `▐text····▌` |
+| focused | `▐►OK◄▌` | `►text_···◄` (`_` is the cursor) |
+| disabled | `░ OK ░` | `░text····░` |
+
+Labels take the background of whatever is under them (a panel, or the canvas).
 
 **Focus and inputs.** Focusable components are enabled buttons and fields, in
 declaration order. After start, focus is on the first one. `DISABLE` on the
@@ -228,6 +246,44 @@ focused component moves focus to the next focusable one, or to none.
 
 Every input reports `ok`, `ignored` or an error. The result also gives the fired
 action, the steps used, the globals whose values changed, and the focus.
+
+### 8.1 Characters and the default look
+
+A screen cell holds one character of the **VGA text-mode character set (code
+page 437)** and a colour byte, exactly as VGA text memory does.
+- **Bare metal:** cells are copied to the screen unchanged.
+- **Linux:** cells are written as UTF-8; terminals whose locale is not UTF-8
+  get ASCII line art instead.
+- **Transcripts** are UTF-8, so they read the same as the screen.
+
+The set includes single, double and mixed box-drawing lines, blocks
+`█ ▀ ▄ ▌ ▐`, shades `░ ▒ ▓`, arrows, card suits and smileys.
+
+**Lines join.** A horizontal or vertical `LINE`, or a `BOX` edge, drawn over
+another line merges with it:
+- crossing lines make `┼`;
+- a line ending on a box edge makes `├`;
+- boxes sharing an edge make `┬` and `┴`.
+
+Each cell keeps one style per axis. A new stroke's style wins on its own axis,
+and every combination is in the character set.
+
+**The default look** is a blue-desktop text UI in the style of 1990s DOS
+applications (Turbo Vision, Norton Commander), and needs nothing from the
+program:
+
+| Part | Look |
+|---|---|
+| Window | white double frame on blue |
+| Group | single frame |
+| Title | yellow |
+| Labels | white |
+| Buttons | cyan faces; focused green |
+| Fields | grey faces with a blinking cursor |
+| Status line | cyan |
+
+Bare metal centres the app on a shaded desktop, with the window's shadow cast
+on it. The VGA attribute values are the `GLYPH_ATTR_*` constants in `glyph.h`.
 
 ## 9. Errors
 

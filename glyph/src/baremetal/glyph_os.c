@@ -68,29 +68,36 @@ static int key_wait(void)
     }
 }
 
+/* Menu keys: 1-9, then a-z. */
+static char menu_key(uint32_t n) { return (char)(n < 9 ? '1' + n : 'a' + (n - 9)); }
+
 static int menu(void)
 {
-    uint32_t n;
+    uint32_t n, k;
     int i;
+    char last[2] = { 0, 0 };
     vga_clear(0x07);
     vga_set_color(0x0B);
     glyph_apps_out("Glyph " GLYPH_VERSION " on bare metal (qwen38-27b-baremetal-os boot path)\n\n");
     vga_set_color(0x07);
-    for (n = 0; (i = glyph_apps_nth(n)) >= 0 && n < 9; n++) {
-        char key[4] = { ' ', (char)('1' + n), ' ', 0 };
+    for (n = 0; (i = glyph_apps_nth(n)) >= 0 && n < 9 + 26; n++) {
+        char key[4] = { ' ', menu_key(n), ' ', 0 };
         glyph_apps_out(key);
         glyph_apps_out(glyph_payloads[i].name + 9);        /* skip "examples/" */
         glyph_apps_out("\n");
     }
     vga_set_color(0x0E);
     glyph_apps_out("\nPress 1-");
-    glyph_apps_out_u32(n);
+    last[0] = menu_key(n ? n - 1 : 0);
+    glyph_apps_out(last);
     glyph_apps_out(" to run a program, ESC to power off.\n");
     vga_set_color(0x07);
     for (;;) {
         int c = key_wait();
         if (c == 27) return -1;
-        if (c >= '1' && c < '1' + (int)n) return glyph_apps_nth((uint32_t)(c - '1'));
+        if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+        for (k = 0; k < n; k++)
+            if (c == menu_key(k)) return glyph_apps_nth(k);
     }
 }
 

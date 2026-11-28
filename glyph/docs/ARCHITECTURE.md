@@ -12,6 +12,7 @@ lex.c ── parse.c (pre-scan arities, compile, link) ──► bytecode + tabl
                                      exec.c   stack VM: value / local / frame stacks, step budget
                                      turtle.c canvas + turtle (fixed point)
                                      ui.c     globals, components, focus, events, render
+                                     cp437.c  VGA character set <-> Unicode (UTF-8 in and out)
                                                           │
                     ┌─────────────────────────────────────┴───────────────────┐
                     │ runner.c: interactive loop over                         │ script.c: event script
@@ -20,8 +21,8 @@ lex.c ── parse.c (pre-scan arities, compile, link) ──► bytecode + tabl
      ┌──────────────┴───────────────┐
      ▼                              ▼
 src/host/term.c                src/baremetal/glyph_bm.c
-ANSI terminal, termios         existing VGA/PS/2/COM1 drivers
-(Linux executable)             (fork's drivers.asm, via SysV calls)
+ANSI terminal, termios,        cells copied to VGA text memory;
+UTF-8 (ASCII if not)           PS/2/COM1 input via the fork's drivers
 ```
 
 Everything above the backends, `src/core/*.c`, is the **shared core**: one set
@@ -54,6 +55,7 @@ of source files compiled unchanged for both targets. It is freestanding C99:
 | 8 | Event dispatcher | `src/core/ui.c` | Key, click and named-action inputs; one handler unit per input, run to completion. |
 | 9 | Rendering interface | `glyph_render()` + `glyph_row_fn` | Composes the canvas and components row by row into `vm->row` and hands each row to the caller. |
 | 10 | Platform/backend interface | `include/glyph_backend.h`, `src/core/runner.c` | `struct glyph_backend` (poll_key, idle, begin/end_frame, draw_row, status) and the shared runner loop. |
+| 11 | Characters | `src/core/cp437.c` | Cells hold VGA (code page 437) codes. UTF-8 string literals map to them, and transcripts and the terminal get UTF-8 back (SPEC §8.1, D32–D34). Line joins are in `turtle.c`. |
 
 ## Compilation
 
