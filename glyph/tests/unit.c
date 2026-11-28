@@ -10,6 +10,7 @@
 
 #include "glyph.h"
 #include "glyph_backend.h"
+#include "glyph_draw.h"
 
 static glyph_vm vm;
 static glyph_diag diag;
@@ -828,6 +829,251 @@ TEST(transcript_script_errors)
     CHECK_CODE(glyph_transcript(0, src, 2, "", 0, &b), GLYPH_E_ARG);
 }
 
+/* ---- extracting a program from model output -------------------------------- */
+static char xbuf[GLYPH_MAX_SOURCE + 2];
+static size_t xlen;
+
+static int extract(const char *text)
+{
+    return glyph_extract(&vm, text, strlen(text), xbuf, sizeof xbuf, &xlen, &diag);
+}
+
+TEST(extract_model_output)
+{
+    /* prose before the code (Qwen3-0.6B's actual answer to the one-shot primer) */
+    CHECK_CODE(extract("The program for a square of side 6 would be:\n\nREPEAT 4 [FD 6 RT 90]\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "REPEAT 4 [FD 6 RT 90]\n") == 0);
+    CHECK_EQ(xlen, 22);
+    CHECK_CODE(glyph_start(&vm, &res), GLYPH_OK);                   /* it is loaded in vm */
+    CHECK(canvas_ch(40, 12) == '*' && canvas_ch(40, 6) == '*' && canvas_ch(46, 6) == '*');
+    /* Markdown fence with a language tag, prose after */
+    CHECK_CODE(extract("Here is the program:\n```logo\nREPEAT 5 [FD 8 RT 144]\n```\nThis draws a star.\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "REPEAT 5 [FD 8 RT 144]\n") == 0);
+    /* numbered and bulleted lists */
+    CHECK_CODE(extract("Sure! Here you go.\n1. PENDOWN\n2) FD 3\n- RT 90\n* FD 2\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "PENDOWN\nFD 3\nRT 90\nFD 2\n") == 0);
+    /* empty think block, CRLF line ends, indentation */
+    CHECK_CODE(extract("<think>\r\n\r\n</think>\r\n\r\n   REPEAT 3 [FD 5 RT 120]\r\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "REPEAT 3 [FD 5 RT 120]\n") == 0);
+    /* prose that starts with a letter and mentions a Glyph word */
+    CHECK_CODE(extract("To draw a square, use REPEAT.\nREPEAT 4 [FD 6 RT 90]\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "REPEAT 4 [FD 6 RT 90]\n") == 0);
+    /* labels before the code ("a star: ", "Program: ") */
+    CHECK_CODE(extract("a star: REPEAT 5 [FD 8 RT 144]\nProgram:   FD 2\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "REPEAT 5 [FD 8 RT 144]\nFD 2\n") == 0);
+    CHECK_CODE(extract("TEXT 1 1 \"Score: 5\"\nFD 1 ; note: up\n"), GLYPH_OK);     /* not labels */
+    CHECK(strcmp(xbuf, "TEXT 1 1 \"Score: 5\"\nFD 1 ; note: up\n") == 0);
+    CHECK_CODE(extract("TO SQ :n\nFD :n\nEND\nSQ 3\n"), GLYPH_OK);                    /* ":n" is no label */
+    CHECK(strcmp(xbuf, "TO SQ :n\nFD :n\nEND\nSQ 3\n") == 0);
+    /* Markdown emphasis and inline code (Qwen3-0.6B's replies) */
+    CHECK_CODE(extract("The correct answer is:  \n**REPEAT 3 [FD 1 RT 100]**  \n\nThis matches.\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "REPEAT 3 [FD 1 RT 100]\n") == 0);
+    CHECK_CODE(extract("**a staircase: REPEAT 5 [FD 10 RT 15]**\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "REPEAT 5 [FD 10 RT 15]\n") == 0);
+    CHECK_CODE(extract("Program: `FD 3`\n- `RT 90`\n__FD 1__\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "FD 3\nRT 90\nFD 1\n") == 0);
+    CHECK_CODE(extract("The corrected program is: `Glyph is LOGO.`\n"), GLYPH_E_SYNTAX);   /* prose in code */
+    CHECK_EQ(xlen, 0);
+    CHECK_CODE(extract("`\n**\n* \n1. \n"), GLYPH_E_SYNTAX);                              /* degenerate */
+    /* procedures survive intact; comments and strings with prose characters are code */
+    CHECK_CODE(extract("TO SQ :n\nREPEAT 4 [FD :n RT 90] ; a square, really!\nEND\nSQ 5\nTEXT 1 1 \"Done, ok?\"\n"), GLYPH_OK);
+    CHECK(strcmp(xbuf, "TO SQ :n\nREPEAT 4 [FD :n RT 90] ; a square, really!\nEND\nSQ 5\nTEXT 1 1 \"Done, ok?\"\n") == 0);
+
+    /* a genuine code error is reported, not hidden (the model's real mistake) */
+    CHECK_CODE(extract("REPEAT 4 TIMES [FD 6 RT 90]\n"), GLYPH_E_UNKNOWN);
+    CHECK_EQ(diag.line, 1);
+    CHECK_EQ(diag.col, 10);
+    CHECK(strcmp(xbuf, "REPEAT 4 TIMES [FD 6 RT 90]\n") == 0);
+    /* ...with its position in the extracted program */
+    CHECK_CODE(extract("Here:\nFD 5\nRT 90\nFD [\n"), GLYPH_E_SYNTAX);
+    CHECK_EQ(diag.line, 3);
+    /* an error at the end of the text is a code error (here: FD missing its input) */
+    CHECK_CODE(extract("FD\n"), GLYPH_E_SYNTAX);
+    CHECK_EQ(diag.line, 2);
+    CHECK(strstr(diag.msg, "not enough inputs") != 0);
+    CHECK_CODE(extract("Here you go:\nREPEAT 4 [FD 6 RT 90\n"), GLYPH_E_UNCLOSED);
+    CHECK_EQ(diag.line, 1);
+    CHECK_EQ(diag.col, 10);
+    CHECK(strcmp(xbuf, "REPEAT 4 [FD 6 RT 90\n") == 0);
+    /* a line that starts with a Glyph word is code, even when it is wrong */
+    CHECK_CODE(extract("RT 90 degrees\n"), GLYPH_E_UNKNOWN);
+    CHECK_EQ(diag.line, 1);
+
+    /* nothing usable */
+    CHECK_CODE(extract("I cannot draw.\n"), GLYPH_E_SYNTAX);
+    CHECK(strstr(diag.msg, "no Glyph program") != 0);
+    CHECK_EQ(xlen, 0);
+    CHECK_CODE(extract(""), GLYPH_E_SYNTAX);
+    CHECK_CODE(extract("```\n```\n# Title\n42\n"), GLYPH_E_SYNTAX);
+    CHECK_CODE(extract("Why? Because, well, it's late!\nOk.\n"), GLYPH_E_SYNTAX);
+
+    /* arguments and size */
+    xlen = 99;
+    CHECK_CODE(glyph_extract(&vm, "FD 1", 4, xbuf, 4, &xlen, &diag), GLYPH_E_SOURCE_SIZE);
+    CHECK_EQ(xlen, 0);                                   /* every return sets outlen */
+    {   /* exact-size heap buffers, so ASan sees any write past the end */
+        char *b5 = malloc(5), *b6 = malloc(6);
+        CHECK_CODE(glyph_extract(&vm, "FD 1", 4, b5, 5, &xlen, &diag), GLYPH_E_SOURCE_SIZE);
+        CHECK_CODE(glyph_extract(&vm, "FD 1", 4, b6, 6, &xlen, &diag), GLYPH_OK);
+        CHECK(strcmp(b6, "FD 1\n") == 0);
+        free(b5);
+        free(b6);
+    }
+    CHECK_CODE(glyph_extract(&vm, "FD 1", 4, 0, 10, &xlen, &diag), GLYPH_E_ARG);
+    CHECK_CODE(glyph_extract(0, "FD 1", 4, xbuf, sizeof xbuf, &xlen, &diag), GLYPH_E_ARG);
+    {
+        static char huge[GLYPH_MAX_SOURCE + 2];
+        memset(huge, 'a', sizeof huge - 1);
+        CHECK_CODE(glyph_extract(&vm, huge, sizeof huge - 1, xbuf, sizeof xbuf, &xlen, &diag), GLYPH_E_SOURCE_SIZE);
+    }
+    /* bounded: many prose lines are dropped one load each, then the code loads */
+    {
+        static char many[GLYPH_MAX_SOURCE];
+        size_t n = 0;
+        int i;
+        for (i = 0; i < 500; i++) { memcpy(many + n, "Note line\n", 10); n += 10; }
+        memcpy(many + n, "FD 4\n", 5); n += 5;
+        CHECK_CODE(glyph_extract(&vm, many, n, xbuf, sizeof xbuf, &xlen, &diag), GLYPH_OK);
+        CHECK(strcmp(xbuf, "FD 4\n") == 0);
+    }
+}
+
+/* ---- /draw with a fake model ------------------------------------------------- */
+typedef struct fake_model {
+    const char *replies[4];
+    int n_gen, n_run, run_status;
+    char prompts[4][GLYPH_DRAW_PROMPT];
+    char ran[256];
+    char log[4096];
+} fake_model;
+
+static uint64_t fm_generate(void *u, const char *prompt, char *out, uint64_t cap)
+{
+    fake_model *m = u;
+    const char *r = m->replies[m->n_gen < 4 ? m->n_gen : 3];
+    size_t n = strlen(r);
+    if (m->n_gen < 4) snprintf(m->prompts[m->n_gen], sizeof m->prompts[0], "%s", prompt);
+    m->n_gen++;
+    if (n >= cap) n = cap - 1;
+    memcpy(out, r, n);
+    out[n] = 0;
+    return n;
+}
+
+static int fm_run(void *u, const char *src, uint64_t len)
+{
+    fake_model *m = u;
+    m->n_run++;
+    snprintf(m->ran, sizeof m->ran, "%.*s", (int)len, src);
+    return m->run_status;
+}
+
+static void fm_out(void *u, const char *t)
+{
+    fake_model *m = u;
+    strncat(m->log, t, sizeof m->log - strlen(m->log) - 1);
+}
+
+static fake_model fm;
+static glyph_vm draw_vm;
+
+static int draw(const char *request, const char *r0, const char *r1, const char *r2)
+{
+    glyph_draw_ops ops;
+    memset(&fm, 0, sizeof fm);
+    fm.replies[0] = r0; fm.replies[1] = r1 ? r1 : r0; fm.replies[2] = r2 ? r2 : fm.replies[1];
+    fm.replies[3] = fm.replies[2];
+    ops.generate = fm_generate; ops.run = fm_run; ops.out = fm_out; ops.user = &fm;
+    ops.primer = "Draw {REQUEST}.\n";
+    ops.repair = "Fix {REQUEST}:\n{PROGRAM}\nError: {ERROR}\n";
+    return glyph_draw(&ops, &draw_vm, request);
+}
+
+TEST(draw_fill_templates)
+{
+    char b[64];
+    CHECK_EQ(glyph_draw_fill(b, sizeof b, "a {REQUEST} b\n\n", "star", 0, 0), 8);
+    CHECK(strcmp(b, "a star b") == 0);
+    /* values are inserted once, never rescanned; trailing newlines dropped */
+    CHECK(glyph_draw_fill(b, sizeof b, "{REQUEST}|{PROGRAM}|{ERROR}|{OTHER}", "{PROGRAM}", "FD 1\n", "e") > 0);
+    CHECK(strcmp(b, "{PROGRAM}|FD 1|e|{OTHER}") == 0);
+    CHECK_EQ(glyph_draw_fill(b, 8, "{REQUEST}", "12345678", 0, 0), -1);
+    CHECK_EQ(glyph_draw_fill(b, 8, "12345678", 0, 0, 0), -1);
+    CHECK_EQ(glyph_draw_fill(b, 8, "1234567", 0, 0, 0), 7);
+    CHECK_EQ(glyph_draw_fill(b, 8, "{ERROR}x", 0, 0, 0), 1);       /* missing value: empty */
+}
+
+TEST(draw_loop)
+{
+    /* first reply works: one generation, then the extracted program runs */
+    CHECK_CODE(draw("  a square ", "Here is the program:\nREPEAT 4 [FD 6 RT 90]\n", 0, 0), GLYPH_OK);
+    CHECK_EQ(fm.n_gen, 1);
+    CHECK_EQ(fm.n_run, 1);
+    CHECK(strcmp(fm.prompts[0], "Draw a square.") == 0);              /* request trimmed */
+    CHECK(strcmp(fm.ran, "REPEAT 4 [FD 6 RT 90]\n") == 0);
+    CHECK(strstr(fm.log, "[draw] drawing it (ESC returns)\n[draw] program:\nREPEAT 4 [FD 6 RT 90]\n[draw] done\n") != 0);
+    /* a code error goes back to the model with the diagnostic */
+    CHECK_CODE(draw("a square", "REPEAT 4 TIMES [FD 6 RT 90]", "REPEAT 4 [FD 6 RT 90]", 0), GLYPH_OK);
+    CHECK_EQ(fm.n_gen, 2);
+    CHECK_EQ(fm.n_run, 1);
+    CHECK(strcmp(fm.prompts[1], "Fix a square:\nREPEAT 4 TIMES [FD 6 RT 90]\nError: line 1: unknown command TIMES") == 0);
+    CHECK(strstr(fm.log, "error in the model's program: line 1: unknown command TIMES") != 0);
+    /* at most 1 + GLYPH_DRAW_RETRIES replies; nothing runs */
+    CHECK_CODE(draw("a square", "FD [", 0, 0), GLYPH_E_SYNTAX);         /* not enough inputs to FD */
+    CHECK_EQ(fm.n_gen, 1 + GLYPH_DRAW_RETRIES);
+    CHECK_EQ(fm.n_run, 0);
+    CHECK(strstr(fm.log, "no working program") != 0);
+    /* no program at all: not retried (greedy decoding would repeat it) */
+    CHECK_CODE(draw("a square", "I am sorry, I cannot draw.", 0, 0), GLYPH_E_SYNTAX);
+    CHECK_EQ(fm.n_gen, 1);
+    CHECK_EQ(fm.n_run, 0);
+    CHECK(strstr(fm.log, "no Glyph program found") != 0);
+    /* a repair reply with no program stops the loop; the earlier program is
+     * not reused (the reply is cut to the buffer, which extraction always fits) */
+    {
+        static char huge2[GLYPH_DRAW_REPLY * 2];
+        memset(huge2, 'x', sizeof huge2 - 1);
+        CHECK_CODE(draw("a square", "FD [", huge2, "FD 1"), GLYPH_E_SYNTAX);
+        CHECK_EQ(fm.n_gen, 2);
+        CHECK_EQ(fm.n_run, 0);
+        CHECK(strstr(fm.log, "no Glyph program found") != 0);
+    }
+    /* the program's own runtime error is reported */
+    memset(&fm, 0, sizeof fm);
+    {
+        glyph_draw_ops ops;
+        fm.replies[0] = fm.replies[1] = fm.replies[2] = fm.replies[3] = "FD 1";
+        fm.run_status = GLYPH_E_BUDGET;
+        ops.generate = fm_generate; ops.run = fm_run; ops.out = fm_out; ops.user = &fm;
+        ops.primer = "{REQUEST}"; ops.repair = "{REQUEST}";
+        CHECK_CODE(glyph_draw(&ops, &draw_vm, "x"), GLYPH_E_BUDGET);
+        CHECK(strstr(fm.log, "stopped with an error") != 0);
+    }
+    /* requests: empty, blank, too long */
+    CHECK_CODE(draw("", "FD 1", 0, 0), GLYPH_E_ARG);
+    CHECK_EQ(fm.n_gen, 0);
+    CHECK(strstr(fm.log, "usage: /draw") != 0);
+    CHECK_CODE(draw("   ", "FD 1", 0, 0), GLYPH_E_ARG);
+    CHECK_CODE(draw(0, "FD 1", 0, 0), GLYPH_E_ARG);
+    {
+        char longreq[GLYPH_DRAW_MAX_REQUEST + 2];
+        memset(longreq, 'a', sizeof longreq - 1);
+        longreq[sizeof longreq - 1] = 0;
+        CHECK_CODE(draw(longreq, "FD 1", 0, 0), GLYPH_E_ARG);
+        CHECK_EQ(fm.n_gen, 0);
+        longreq[GLYPH_DRAW_MAX_REQUEST] = 0;
+        CHECK_CODE(draw(longreq, "FD 1", 0, 0), GLYPH_OK);
+    }
+    /* a reply longer than the buffer is cut, not overrun */
+    {
+        static char huge[GLYPH_DRAW_REPLY * 2];
+        memset(huge, ' ', sizeof huge - 1);
+        memcpy(huge, "FD 2\n", 5);
+        CHECK_CODE(draw("a line", huge, 0, 0), GLYPH_OK);
+        CHECK(strcmp(fm.ran, "FD 2\n") == 0);
+    }
+}
+
 int main(void)
 {
     printf("sizeof(glyph_vm) = %zu bytes\n", glyph_vm_size());
@@ -878,6 +1124,9 @@ int main(void)
     RUN(tc_budget_ceiling);
     RUN(runner_loop);
     RUN(transcript_script_errors);
+    RUN(extract_model_output);
+    RUN(draw_fill_templates);
+    RUN(draw_loop);
     printf("%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }

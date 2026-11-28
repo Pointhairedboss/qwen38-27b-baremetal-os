@@ -262,6 +262,15 @@ const glyph_diag *glyph_last_diag(const glyph_vm *vm);
  * GLYPH_MAX_STEPS are clamped. Survives glyph_load. */
 void glyph_set_budget(glyph_vm *vm, uint32_t steps);
 
+/* ---- model output ---------------------------------------------------------- */
+/* Pull a Glyph program out of free-form model output (prose, Markdown fences,
+ * list markers). Lines that are prose are dropped; a genuine code error is
+ * returned in d with its position in the extracted program. On GLYPH_OK, out
+ * holds the program (outlen bytes, NUL-terminated) and vm holds it loaded.
+ * vm is used as scratch. cap must be at least len + 2. */
+int glyph_extract(glyph_vm *vm, const char *text, size_t len, char *out, size_t cap,
+                  size_t *outlen, glyph_diag *d);
+
 /* ---- output ------------------------------------------------------------- */
 /* Called once per row, top to bottom, with w composed cells. */
 typedef void (*glyph_row_fn)(void *user, int y, const glyph_cell *cells, int w);

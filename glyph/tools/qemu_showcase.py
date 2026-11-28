@@ -2,12 +2,14 @@
 """Record a walkthrough of Glyph inside the Qwen inference kernel.
 
   python3 -I glyph/tools/qemu_showcase.py MODEL.asmbin [OUT.gif]
+  python3 -I glyph/tools/qemu_showcase.py --draw "a hexagon" MODEL.asmbin [OUT.gif]
   (run from the repository root after `make os`)
 
 Boots build/asm-llm-os.elf in QEMU with the model, then types at the
 asm-llm> prompt on the emulated PS/2 keyboard (QEMU monitor `sendkey`):
 /glyph demo (and uses it), ESC, /glyph rule110, ESC, then a question for
-the model. Each step's VGA screen (`screendump`) becomes a GIF frame.
+the model. With --draw: /draw REQUEST, the model writing the program, the
+drawing, ESC. Each step's VGA screen (`screendump`) becomes a GIF frame.
 Needs qemu-system-x86_64 and ImageMagick.
 """
 import os
@@ -17,8 +19,13 @@ import sys
 import tempfile
 import time
 
-MODEL = sys.argv[1] if len(sys.argv) > 1 else "models/qwen3-0.6b-q8_0.asmbin"
-OUT = sys.argv[2] if len(sys.argv) > 2 else "glyph/docs/screenshots/inference-glyph.gif"
+ARGS = sys.argv[1:]
+DRAW = None
+if ARGS[:1] == ["--draw"]:
+    DRAW, ARGS = ARGS[1], ARGS[2:]
+MODEL = ARGS[0] if ARGS else "models/qwen3-0.6b-q8_0.asmbin"
+OUT = ARGS[1] if len(ARGS) > 1 else ("glyph/docs/screenshots/inference-draw.gif" if DRAW
+                                     else "glyph/docs/screenshots/inference-glyph.gif")
 QUESTION = "What is the capital of Japan? One word."
 KEYNAMES = {" ": "spc", "/": "slash", "?": "shift-slash", ".": "dot", ",": "comma", "-": "minus",
             "\n": "ret"}
@@ -69,13 +76,16 @@ class VM:
                 names.append(KEYNAMES.get(ch, ch))
         self.keys(*names, pause=0.12)
 
-    def wait_serial(self, needle, timeout):
+    def wait_serial(self, needle, timeout, after=b""):
+        """Wait for needle on COM1 (after the first occurrence of `after`)."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             with open(self.serial, "rb") as f:
-                if needle.encode() in f.read():
-                    return
-            time.sleep(1)
+                data = f.read()
+            i = data.find(after) if after else 0
+            if i >= 0 and needle.encode() in data[i:]:
+                return
+            time.sleep(0.5)
         sys.exit(f"timed out waiting for {needle!r}")
 
     def frame(self, label):
@@ -89,11 +99,39 @@ class VM:
         self.proc.wait(timeout=20)
 
 
+def draw_walkthrough(vm):
+    vm.type("/draw " + DRAW)
+    vm.frame(f"typed /draw {DRAW}")
+    vm.keys("ret")
+    vm.wait_serial("[draw] asking the model", 60)
+    vm.wait_serial("REPEAT", 3600, after=b"[draw] asking the model")
+    vm.frame("the model writes the program (streamed as it decodes)")
+    vm.wait_serial("[draw] drawing it", 3600)
+    time.sleep(2)
+    vm.frame("Glyph draws it")
+    vm.keys("esc")
+    vm.wait_serial("[draw] back to asm-llm", 60)
+    time.sleep(1)
+    vm.frame("ESC: the program and back at asm-llm>")
+
+
 with tempfile.TemporaryDirectory() as tmp:
     vm = VM(tmp)
     vm.wait_serial("asm-llm> ", 120)
     time.sleep(1)
     vm.frame("boot: banner and asm-llm> prompt")
+    if DRAW:
+        draw_walkthrough(vm)
+        vm.quit()
+        cmd = ["convert", "-loop", "0"]
+        for i, f in enumerate(vm.frames):
+            cmd += ["-delay", "500" if i == len(vm.frames) - 1 else "220", f]
+        subprocess.run(cmd + ["-layers", "Optimize", OUT], check=True)
+        for i, f in enumerate(vm.frames):
+            subprocess.run(["convert", f, "-filter", "point", "-resize", "200%",
+                            os.path.join(os.path.dirname(OUT), f"draw-{i + 1:02d}.png")], check=True)
+        print("wrote", OUT)
+        sys.exit(0)
     vm.type("/glyph demo")
     vm.frame("typed /glyph demo at the prompt")
     vm.keys("ret")

@@ -1,0 +1,5 @@
+<think>
+
+</think>
+
+REPEAT 3 [FD 5 RT 120]

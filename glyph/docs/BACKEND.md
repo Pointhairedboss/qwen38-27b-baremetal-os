@@ -110,29 +110,30 @@ driver's cursor, and writing the 80th column of row 24 scrolls the screen.
 | Check | Command | Result |
 |---|---|---|
 | Core compiles with kernel flags, zero undefined symbols | `make freestanding` | pass |
-| Core + adapter + shims link against the fork's own `drivers.asm` (Phase 2 and Phase 4); every Glyph import resolves | `make baremetal-link` | pass. Only `g_boot_tsc` (needed by `drivers.asm`, provided by `boot.asm`) remains. |
-| Full link of the **unmodified** Phase 2 and Phase 4 kernels with the fork's linker scripts and ld flags, Glyph entry points kept with `ld -u` | `make kernel-link` | pass. Multiboot magic stays at file offset 4096. The baseline Phase 2 image is 24 252 B, the size the fork's README documents. With Glyph v0.2 it is 77 752 B (`.text` +45.4 KB, `.bss` +118 KB). Phase 4 goes from 33 052 to 86 300 B. |
+| Core + adapter + shims link against the fork's own `drivers.asm` (Phase 2 and Phase 4); every Glyph import resolves | `make baremetal-link` | pass. What remains is provided by the kernel: `g_boot_tsc` (needed by `drivers.asm`, from `boot.asm`) and, for `/draw`, `g_ctx` (`shared/transformer.asm`) and the weak `glyph_generate` (Phase 2 `kernel.asm`). |
+| Full link of the Phase 2 kernel (as pinned at `6c43dec`, and as changed for `/glyph` and `/draw`) and the unmodified Phase 4 kernel, with the fork's linker scripts and ld flags; Phase 4 keeps the Glyph entry points with `ld -u` | `make kernel-link` | pass. Multiboot magic stays at file offset 4096. The pinned Phase 2 image is 24 252 B, the size the fork's README documents. With Glyph it is 108 816 B (`.text` +51.2 KB, `.bss` +217 KB: two VMs of 85 KB, for programs and for `/draw`'s extraction, plus buffers). Phase 4 goes from 33 052 to 114 972 B. |
 | **Boot in a VM.** `build/glyph-os.elf` is the fork's unmodified Phase 2 `boot.asm`, `drivers.asm`, `runtime.asm` and `linker.ld`, plus Glyph and `src/baremetal/glyph_os.c` (`kernel_main`), following the precedent of Phase 4's `bartest`. It boots under QEMU 8.2 (TCG, no KVM) via Multiboot. | `make glyph-os`, `make qemu-run` | pass. 88 KB image with 55 programs embedded. Boots and runs them all in under 1 s. |
 | **Bare-metal conformance.** The kernel boots with `glyph=test`, writes every embedded transcript to COM1 and powers off. The host compares each one byte for byte with the Linux `.expect`. | `make qemu-test` | **55/55 identical** (46 corpus cases and 9 examples), with `-cpu max` (AVX enabled by `boot.asm`) and with `-cpu qemu64` (no AVX). |
 | **VGA and PS/2 path.** Keys sent through the QEMU monitor (`sendkey`) arrive as scancodes on the emulated i8042 and go through the fork's `ps2_try_getc`. Screens are taken with `screendump` from the emulated VGA text buffer. | `make vm-screenshots` | pass. Interactive Turing machine, demo (typing a name with Shift), menu and Rule 110: `docs/screenshots/vm-*.png`. |
 
+Glyph inside the Qwen inference kernel, with the real model, is verified in §5.
+
 **Not verified:**
 - Nothing has run on P510 hardware.
-- Glyph has not run *inside* the Qwen inference kernel. That needs a model file,
-  which this environment does not have, and the kernel's REPL is only reached after
-  the model loads.
 - Phase 4 has not been exercised beyond linking.
 - QEMU here is TCG emulation, so timing says nothing about real hardware.
 
 ## 5. Integration into the inference kernel (Phase 2: implemented and tested under QEMU)
 
 **Status.** Implemented with the owner's go-ahead, and it builds and links: the
-root `make os` produces `build/asm-llm-os.elf` at 103 448 B, against 24 252 B for
+root `make os` produces `build/asm-llm-os.elf` at 108 816 B, against 24 252 B for
 the pinned upstream kernel (`tests/kernel_link.sh`). At the `asm-llm>` prompt:
 
 - `/glyph` lists the built-in programs.
 - `/glyph NAME` runs one on VGA; ESC returns to the chat.
 - `/glyphtest` prints the conformance transcripts on COM1.
+- `/draw REQUEST`: the model writes a Glyph program and Glyph draws it
+  (docs/DRAW.md; verified below).
 
 **End-to-end result (2026-11-27, QEMU 8.2 TCG, 4 vCPUs, `-cpu max`, real Qwen3-0.6B
 Q8_0 exported with the fork's `scripts/export_weights.py`).**
@@ -189,5 +190,5 @@ identical transcripts.
   needs about 170 ms per full frame.
 - APs are idle in the spin barrier while the REPL runs. Glyph runs on the BSP only,
   between inference calls.
-- Phase 4: confirm that `.bss` growth (+118 KB) does not collide with
+- Phase 4: confirm that `.bss` growth (+213 KB) does not collide with
   the ivshmem BAR mapping or the paging layout.

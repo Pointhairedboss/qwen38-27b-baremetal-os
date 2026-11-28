@@ -169,6 +169,42 @@ without changing any kernel file. Glyph inside the inference kernel came next
 inference turns and never touches the model, KV cache, arena or AP cores; its
 state is in `.bss`. The owner approved the kernel change on 2026-11-27.
 
+<a id="d27"></a>**D27 — Pulling code out of model replies is part of the core
+(`glyph_extract`).** Small models wrap code in prose, Markdown and labels. A
+reply is cleaned line by line and loaded; a line whose error is at its first
+word, and that word is not a Glyph word, is prose and is dropped, and loading is
+retried (at most once per line). Any other error is returned as a code error,
+with its position in the extracted program. It is in the core so the host
+(`glyph extract`), the tests and fuzzing, and the kernel use one implementation.
+The rules are in `src/core/extract.c` and docs/DRAW.md.
+
+<a id="d28"></a>**D28 — `/draw` uses the model the way `/bench` does.**
+`glyph_generate` in `kernel.asm` sets the options for one turn (fresh context,
+no thinking, greedy, the chat template, 64 tokens), calls the unchanged `run_inference`
+and restores the options. The reply streams to the screen as usual. Afterwards
+the chat starts afresh, as after `/bench`, because the turn overwrote the KV
+cache from position 0. The alternative, appending the turn to the chat and
+rewinding, would have given the model the chat history as context and broken
+the equivalence with the single-turn Linux runs used to tune the prompt.
+
+<a id="d29"></a>**D29 — A code error goes back to the model; a missing program
+does not.** Decoding is greedy, so the same prompt always gives the same reply.
+A reply with a program that fails to load gets the repair prompt (the program
+and "line L: message"), at most twice. A reply with no program at all would come
+back unchanged, so `/draw` stops and says so.
+
+<a id="d30"></a>**D30 — The prompt was chosen by measurement, on Linux.**
+`tools/draw_eval.py` runs the `/draw` loop on `build/asm-llm`, which is
+token-identical to the kernel, so a prompt can be scored in about 25 seconds per
+request instead of minutes under TCG. Five prompts were compared (docs/DRAW.md);
+the labelled-examples prompt was kept. The prompt is a text file
+(`tools/draw_primer.txt`) assembled into the kernel with `incbin`, so the file the
+tools score is the file the kernel uses.
+
+<a id="d31"></a>**D31 — The kernel hook is weak.** `glyph-kernel.o` declares
+`glyph_generate` weak, so the same object still links into the Phase 4 kernel,
+which does not have the hook; there `/draw` reports that it is not available.
+
 ## Deviations from bootLogo semantics
 
 Reference: `nanochess/bootLogo` at `e3ce458a6d4eb0c0f41e3fc0f1239e09864b9df0`

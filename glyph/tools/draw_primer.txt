@@ -1,0 +1,5 @@
+Glyph is LOGO on a text screen. Examples:
+a square: REPEAT 4 [FD 6 RT 90]
+a triangle: REPEAT 3 [FD 8 RT 120]
+a circle: REPEAT 36 [FD 1 RT 10]
+{REQUEST}:

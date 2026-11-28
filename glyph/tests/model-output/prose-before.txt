@@ -1,0 +1,3 @@
+The program for a square of side 6 would be:
+
+REPEAT 4 [FD 6 RT 90]

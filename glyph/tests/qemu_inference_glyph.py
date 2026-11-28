@@ -19,12 +19,13 @@ VGA screenshots go to OUTDIR (default glyph/docs/screenshots).
 """
 import os
 import re
-import socket
 import subprocess
 import sys
 import tempfile
-import threading
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from qemu_kernel import Kernel  # noqa: E402
 
 MODEL = sys.argv[1] if len(sys.argv) > 1 else "models/qwen3-0.6b-q8_0.asmbin"
 OUT = sys.argv[2] if len(sys.argv) > 2 else "glyph/docs/screenshots"
@@ -40,87 +41,6 @@ def phase1(prompt):
     err = res.stderr.decode(errors="replace")
     return (re.search(r"PROMPT_TOKENS:([0-9,]+)", err).group(1),
             re.search(r"GEN_TOKENS:([0-9,]*)", err).group(1), res.stdout.decode(errors="replace").strip())
-
-
-class Kernel:
-    def __init__(self, tmp):
-        self.serial_path = os.path.join(tmp, "serial.sock")
-        self.mon_path = os.path.join(tmp, "mon.sock")
-        self.tmp = tmp
-        cmdline = f'prompt="{PROMPTS[0]}" max_tokens={MAX_TOKENS} print_tokens=1 shutdown=0'
-        self.proc = subprocess.Popen([
-            "qemu-system-x86_64", "-machine", "pc", "-cpu", "max", "-m", "2G", "-smp", str(SMP),
-            "-no-reboot", "-display", "none", "-vga", "std",
-            "-serial", f"unix:{self.serial_path},server,nowait",
-            "-monitor", f"unix:{self.mon_path},server,nowait",
-            "-kernel", "build/asm-llm-os.elf", "-initrd", MODEL, "-append", cmdline])
-        for _ in range(200):
-            if os.path.exists(self.serial_path) and os.path.exists(self.mon_path):
-                break
-            time.sleep(0.05)
-        self.ser = socket.socket(socket.AF_UNIX)
-        self.ser.connect(self.serial_path)
-        self.mon = socket.socket(socket.AF_UNIX)
-        self.mon.connect(self.mon_path)
-        self.buf = b""
-        self.lock = threading.Lock()
-        threading.Thread(target=self._reader, daemon=True).start()
-        self._mon_read()
-
-    def _reader(self):
-        while True:
-            chunk = self.ser.recv(65536)
-            if not chunk:
-                return
-            with self.lock:
-                self.buf += chunk
-
-    def text(self):
-        with self.lock:
-            return self.buf.decode("utf-8", errors="replace")
-
-    def wait_for(self, pattern, start, timeout):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            m = re.compile(pattern, re.S).search(self.text(), start)
-            if m:
-                return m
-            if self.proc.poll() is not None:
-                break
-            time.sleep(0.2)
-        sys.exit(f"timed out waiting for {pattern!r}; serial tail:\n{self.text()[-1500:]}")
-
-    def send(self, line):
-        self.ser.sendall(line.encode() + b"\r")
-
-    def _mon_read(self):
-        buf = b""
-        while not buf.endswith(b"(qemu) "):
-            chunk = self.mon.recv(4096)
-            if not chunk:
-                return
-            buf += chunk
-
-    def mon_cmd(self, line):
-        self.mon.sendall(line.encode() + b"\n")
-        self._mon_read()
-
-    def keys(self, *names):
-        for k in names:
-            self.mon_cmd(f"sendkey {k}")
-            time.sleep(0.3)
-        time.sleep(1.0)
-
-    def shot(self, name):
-        ppm = os.path.join(self.tmp, name + ".ppm")
-        self.mon_cmd(f"screendump {ppm}")
-        png = os.path.join(OUT, name + ".png")
-        subprocess.run(["convert", ppm, "-filter", "point", "-resize", "200%", png], check=True)
-        print(f"  screenshot {png}")
-
-    def quit(self):
-        self.mon.sendall(b"quit\n")
-        self.proc.wait(timeout=20)
 
 
 failures = 0
@@ -139,7 +59,8 @@ for p, (pt, gt, txt) in zip(PROMPTS, ref):
 
 os.makedirs(OUT, exist_ok=True)
 with tempfile.TemporaryDirectory() as tmp:
-    k = Kernel(tmp)
+    k = Kernel(tmp, f'prompt="{PROMPTS[0]}" max_tokens={MAX_TOKENS} print_tokens=1 shutdown=0',
+               MODEL, SMP, OUT)
     t0 = time.time()
     print("Kernel (build/asm-llm-os.elf with Glyph) booting under QEMU ...")
     m = k.wait_for(r"PROMPT_TOKENS:([0-9,]+).*?GEN_TOKENS:([0-9,]*)", 0, 3600)

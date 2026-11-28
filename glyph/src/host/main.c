@@ -5,6 +5,7 @@
  *   glyph replay FILE [EVENTS|-]  run an event script, print the transcript
  *   glyph test [--update] [DIR]   run the conformance corpus
  *   glyph dump FILE               print the compiled IR
+ *   glyph extract FILE|-          pull a Glyph program out of model output
  *   glyph limits                  print compiled-in limits
  */
 #include <dirent.h>
@@ -274,6 +275,27 @@ static int cmd_dump(int argc, char **argv)
     return 0;
 }
 
+static char g_extracted[GLYPH_MAX_SOURCE + 2];
+
+static int cmd_extract(int argc, char **argv)
+{
+    glyph_diag d;
+    size_t n = 0;
+    long len;
+    int e;
+    if (argc != 1) { fprintf(stderr, "usage: glyph extract FILE|-\n"); return 2; }
+    len = read_file(argv[0], g_src, sizeof g_src);
+    if (len < 0) { fprintf(stderr, "%s: cannot read: %s\n", argv[0], strerror(errno)); return 2; }
+    e = glyph_extract(&g_vm, g_src, (size_t)len, g_extracted, sizeof g_extracted, &n, &d);
+    fwrite(g_extracted, 1, n, stdout);
+    if (e) {
+        if (d.line > 0) fprintf(stderr, "extracted:%d:%d: error %s: %s\n", d.line, d.col, glyph_code_name(d.code), d.msg);
+        else fprintf(stderr, "error %s: %s\n", glyph_code_name(d.code), d.msg);
+        return 1;
+    }
+    return 0;
+}
+
 static int cmd_limits(void)
 {
     printf("glyph %s\n", GLYPH_VERSION);
@@ -309,6 +331,7 @@ static void usage(void)
             "  glyph replay [--budget N] FILE [EVENTS|-]  run an event script, print the transcript\n"
             "  glyph test [--update] [DIR]   run the conformance corpus (default tests/corpus)\n"
             "  glyph dump FILE               print the compiled bytecode\n"
+            "  glyph extract FILE|-          pull a Glyph program out of model output\n"
             "  glyph limits                  print compiled-in limits\n",
             GLYPH_VERSION);
 }
@@ -321,6 +344,7 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "replay") == 0) return cmd_replay(argc - 2, argv + 2);
     if (strcmp(argv[1], "test") == 0) return cmd_test(argc - 2, argv + 2);
     if (strcmp(argv[1], "dump") == 0) return cmd_dump(argc - 2, argv + 2);
+    if (strcmp(argv[1], "extract") == 0) return cmd_extract(argc - 2, argv + 2);
     if (strcmp(argv[1], "limits") == 0) return cmd_limits();
     if (strcmp(argv[1], "version") == 0 || strcmp(argv[1], "--version") == 0) {
         printf("glyph %s\n", GLYPH_VERSION);

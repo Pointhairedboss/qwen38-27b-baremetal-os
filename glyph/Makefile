@@ -16,7 +16,7 @@
 CC       ?= cc
 BUILD    := build
 CORE_SRC := src/core/util.c src/core/lex.c src/core/parse.c src/core/exec.c \
-            src/core/turtle.c src/core/ui.c src/core/runner.c src/core/script.c
+            src/core/turtle.c src/core/ui.c src/core/runner.c src/core/script.c src/core/extract.c
 HOST_SRC := src/host/main.c src/host/term.c
 INC      := -Iinclude -Isrc/core
 
@@ -47,8 +47,10 @@ $(BUILD):
 $(BUILD)/glyph: $(CORE_SRC) $(HOST_SRC) include/*.h src/core/*.h src/host/*.h | $(BUILD)
 	$(CC) $(WARN) $(CFLAGS) $(HOSTDEFS) $(INC) $(CORE_SRC) $(HOST_SRC) -o $@
 
-$(BUILD)/unit: $(CORE_SRC) tests/unit.c include/*.h src/core/*.h | $(BUILD)
-	$(CC) $(WARN) $(CFLAGS) $(HOSTDEFS) $(INC) $(CORE_SRC) tests/unit.c -o $@
+# The /draw loop is portable and tested on the host with a fake model.
+DRAW_SRC := src/baremetal/glyph_draw.c
+$(BUILD)/unit: $(CORE_SRC) $(DRAW_SRC) tests/unit.c include/*.h src/core/*.h src/baremetal/glyph_draw.h | $(BUILD)
+	$(CC) $(WARN) $(CFLAGS) $(HOSTDEFS) $(INC) -Isrc/baremetal $(CORE_SRC) $(DRAW_SRC) tests/unit.c -o $@
 
 unit: $(BUILD)/unit
 	./$(BUILD)/unit
@@ -65,8 +67,8 @@ $(BUILD)/san: | $(BUILD)
 	mkdir -p $(BUILD)/san
 $(BUILD)/san/glyph: $(CORE_SRC) $(HOST_SRC) include/*.h src/core/*.h src/host/*.h | $(BUILD)/san
 	$(CC) $(WARN) -O1 -g $(SAN) $(HOSTDEFS) $(INC) $(CORE_SRC) $(HOST_SRC) -o $@
-$(BUILD)/san/unit: $(CORE_SRC) tests/unit.c include/*.h src/core/*.h | $(BUILD)/san
-	$(CC) $(WARN) -O1 -g $(SAN) $(HOSTDEFS) $(INC) $(CORE_SRC) tests/unit.c -o $@
+$(BUILD)/san/unit: $(CORE_SRC) $(DRAW_SRC) tests/unit.c include/*.h src/core/*.h src/baremetal/glyph_draw.h | $(BUILD)/san
+	$(CC) $(WARN) -O1 -g $(SAN) $(HOSTDEFS) $(INC) -Isrc/baremetal $(CORE_SRC) $(DRAW_SRC) tests/unit.c -o $@
 
 sanitize: $(BUILD)/san/glyph $(BUILD)/san/unit
 	./$(BUILD)/san/unit
@@ -110,9 +112,9 @@ baremetal-link: $(BUILD)/glyph-kernel.o
 		nasm -f elf64 -DBARE_METAL -DFAST_Q8=1 -I$(FORK)/shared/ -I$$dir/ $$dir/drivers.asm -o $(BUILD)/bm/drivers_$$tag.o || exit 1; \
 		ld -r -z noexecstack $(BUILD)/glyph-kernel.o $(BUILD)/bm/drivers_$$tag.o \
 			-o $(BUILD)/bm/glyph_phase$$tag.o || exit 1; \
-		echo "phase $$tag: unresolved after linking with drivers.asm (kernel provides these):"; \
+		echo "phase $$tag: unresolved after linking with drivers.asm (the kernel provides g_boot_tsc and, for /draw, g_ctx and the weak glyph_generate):"; \
 		nm -u $(BUILD)/bm/glyph_phase$$tag.o | tee $(BUILD)/bm/undefined_$$tag.txt; \
-		if grep -v -E ' (g_boot_tsc)$$' $(BUILD)/bm/undefined_$$tag.txt | grep -q .; then \
+		if grep -v -E ' (g_boot_tsc|g_ctx|glyph_generate)$$' $(BUILD)/bm/undefined_$$tag.txt | grep -q .; then \
 			echo "FAIL: unexpected unresolved symbols"; exit 1; fi; \
 		echo "OK: phase $$tag driver symbols resolve"; \
 	done
@@ -147,7 +149,9 @@ QEMU_SYSTEM  ?= qemu-system-x86_64 -machine pc -cpu max -m 256M -no-reboot
 QEMU_DISPLAY ?=
 
 BM_SRC := src/baremetal/glyph_bm.c src/baremetal/glyph_apps.c src/baremetal/glyph_repl.c \
-          src/baremetal/glyph_os.c src/baremetal/glyph_apps.h src/baremetal/glyph_bm_entry.asm
+          src/baremetal/glyph_os.c src/baremetal/glyph_apps.h src/baremetal/glyph_bm_entry.asm \
+          src/baremetal/glyph_draw.c src/baremetal/glyph_draw.h src/baremetal/glyph_model.asm \
+          tools/draw_primer.txt tools/draw_repair.txt
 
 # Objects shared by both bare-metal builds: adapter, app table, programs.
 $(OSK)/apps.o: freestanding $(BM_SRC) tools/mkpayload.sh examples/*.glyph tests/corpus/*.glyph
@@ -167,12 +171,16 @@ $(GLYPH_OS): $(OSK)/apps.o
 	objcopy -O elf32-i386 $(GLYPH_OS).64 $(GLYPH_OS)
 
 # One relocatable object for the inference kernel (root Makefile, OS_OBJS):
-# core, adapter, app table, programs, the /glyph REPL hook and its asm shims.
+# core, adapter, app table, programs, the /glyph and /draw REPL hooks, their asm
+# shims, and the model-text helper with the /draw prompt templates.
 GLYPH_KOBJ := $(BUILD)/glyph-kernel.o
 $(GLYPH_KOBJ): $(OSK)/apps.o
-	$(CC) $(FREESTANDING) $(INC) -c src/baremetal/glyph_repl.c -o $(OSK)/glyph_repl.o
+	$(CC) $(FREESTANDING) $(INC) -Isrc/baremetal -c src/baremetal/glyph_repl.c -o $(OSK)/glyph_repl.o
+	$(CC) $(FREESTANDING) $(INC) -Isrc/baremetal -c src/baremetal/glyph_draw.c -o $(OSK)/glyph_draw.o
 	nasm -f elf64 src/baremetal/glyph_bm_entry.asm -o $(OSK)/glyph_bm_entry.o
-	ld -r -z noexecstack $(OSK)/apps.o $(OSK)/glyph_repl.o $(OSK)/glyph_bm_entry.o -o $@
+	nasm -f elf64 -I$(FORK)/shared/ src/baremetal/glyph_model.asm -o $(OSK)/glyph_model.o
+	ld -r -z noexecstack $(OSK)/apps.o $(OSK)/glyph_repl.o $(OSK)/glyph_draw.o $(OSK)/glyph_bm_entry.o \
+		$(OSK)/glyph_model.o -o $@
 
 kernel-obj: $(GLYPH_KOBJ)
 

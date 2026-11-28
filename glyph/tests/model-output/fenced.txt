@@ -1,0 +1,5 @@
+Here is the program:
+```logo
+REPEAT 5 [FD 8 RT 144]
+```
+This draws a star.

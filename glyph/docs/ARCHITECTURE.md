@@ -175,8 +175,11 @@ An external caller, such as a future model adapter, needs only `glyph.h`:
 | Renderable output | `glyph_render` (rows of VGA-format cells) |
 | Budget for heavier computation | `glyph_set_budget` (up to 10 000 000 steps per entry) |
 | All of the above in one call, as text | `glyph_transcript(vm, src, len, script, slen, buf)` |
+| Pull a program out of a model's reply (prose, Markdown, labels) | `glyph_extract(vm, text, len, out, cap, &outlen, &diag)` (D27) |
 
-Glyph knows nothing about Qwen, tokenisation or the inference engine. A caller
-passes the model's text to `glyph_load` and feeds the diagnostic back to the
-model as text. `glyph check` prints the same diagnostic as
-`file:line:col: error CODE: message`.
+The core knows nothing about Qwen, tokenisation or the inference engine. A caller
+passes the model's text to `glyph_extract` (or `glyph_load`) and feeds the
+diagnostic back to the model as text. `glyph check` prints the same diagnostic as
+`file:line:col: error CODE: message`; `glyph extract` does the same for a reply.
+The inference kernel's `/draw` does exactly this (`src/baremetal/glyph_draw.c`,
+docs/DRAW.md).

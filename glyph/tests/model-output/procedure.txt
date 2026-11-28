@@ -1,0 +1,4 @@
+TO SQ :n
+REPEAT 4 [FD :n RT 90]
+END
+SQ 5

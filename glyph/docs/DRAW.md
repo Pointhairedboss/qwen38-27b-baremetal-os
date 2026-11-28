@@ -1,0 +1,119 @@
+# `/draw` — the model writes Glyph, the kernel draws it
+
+At the `asm-llm>` prompt of the Phase 2 inference kernel:
+
+```
+asm-llm> /draw a hexagon
+[draw] asking the model for a Glyph program
+a hexagon: REPEAT 6 [FD 10 RT 60]
+[asm-llm-os] prefill: ...
+[draw] drawing it (ESC returns)
+        (the drawing, on VGA, until ESC)
+[draw] program:
+REPEAT 6 [FD 10 RT 60]
+[draw] done
+[draw] back to asm-llm (new chat)
+asm-llm>
+```
+
+The model's reply streams to the screen as it decodes, like any answer. Glyph
+then pulls the program out of the reply, checks it, and runs it under the step
+budget. ESC returns to the chat.
+
+## How it works
+
+```
+ REPL line "/draw REQUEST"
+   │  kernel.asm → glyph_shell_repl → glyph_repl_command (glyph_repl.c)
+   ▼
+ glyph_draw (glyph_draw.c, portable, tested on the host with a fake model)
+   1. prompt = tools/draw_primer.txt with {REQUEST}
+   2. reply  = glyph_generate(prompt, 64)          kernel.asm: one fresh turn, as /bench
+               glyph_model_text(n, buf, cap)       glyph_model.asm: token ids → bytes
+   3. glyph_extract(reply)                         src/core/extract.c
+        ok          → 4
+        code error  → prompt = tools/draw_repair.txt with {REQUEST} {PROGRAM}
+                      {ERROR}="line L: message"; back to 2 (at most 2 repairs)
+        no program  → stop (greedy decoding would repeat the same reply)
+   4. glyph_bm_run(program)                        VGA + PS/2/COM1 until ESC
+```
+
+**The kernel side** is `glyph_generate` in `02-baremetal-os/kernel.asm` (about 30
+lines) and one store in `run_inference` that records the number of generated
+tokens. `glyph_generate` does what `/bench` does: it saves the options, sets
+one fresh greedy turn (no thinking, the chat template, 64 tokens), calls the unchanged
+`run_inference`, and restores the options. The turn starts at position 0 of the
+KV cache, so the chat starts afresh afterwards, as after `/bench` (D28).
+`glyph_model_text` (in `glyph/`, not the kernel) turns the token ids at
+`[g_ctx + CTX_BUF_GEN]` into the bytes `tok_write_stdout` prints, using the CTX
+offsets from the fork's `shared/constants.inc`. Prefill, decode, sampling, the
+scheduler, SMP and the drivers are not touched.
+
+**The model's reply is untrusted input.** It goes through `glyph_extract` and
+`glyph_load` like any other source, so every limit of SPEC §11 applies and a
+bad reply gives a diagnostic, not a crash. The program then runs under the
+default step budget. The request is limited to 160 bytes; every buffer is fixed
+size and every copy is bounded. The core, the extractor and the `/draw` loop
+are fuzzed and tested under ASan/UBSan and Valgrind on the host.
+
+**`glyph_extract`** (D27) cleans the reply line by line:
+
+- It drops ``` fences, `<think>` tags, headings, and lines that end with `:`.
+- It removes list markers (`- `, `* `, `3. `, `3) `), labels up to the first `: `
+  (Glyph never has `: ` outside strings and comments), and Markdown around the
+  code (`**…**`, `__…__`, `` `…` ``).
+- It drops lines that cannot start a statement.
+
+It then loads what is left. When the first error is at a line's first word and
+that word is not a Glyph word, or the line has characters only prose uses
+(`` ` ? ! , ' `` outside strings and comments), the line is prose: it is dropped
+and loading is retried. Any other error is a code error, reported with its
+position in the extracted program. `glyph extract FILE` does the same on the
+host.
+
+## The prompt
+
+`tools/draw_primer.txt`, assembled into the kernel with `incbin`:
+
+```
+Glyph is LOGO on a text screen. Examples:
+a square: REPEAT 4 [FD 6 RT 90]
+a triangle: REPEAT 3 [FD 8 RT 120]
+a circle: REPEAT 36 [FD 1 RT 10]
+{REQUEST}:
+```
+
+`tools/draw_repair.txt`:
+
+```
+Glyph is LOGO. This Glyph program for {REQUEST} has an error.
+{PROGRAM}
+Error: {ERROR}
+Write only the corrected program.
+```
+
+The prompt is short on purpose: under QEMU without KVM, every prompt token costs
+about 5 seconds.
+
+## Choosing the prompt (D30)
+
+`tools/draw_eval.py` runs the `/draw` loop on the Linux build (`build/asm-llm`,
+token-identical to the kernel, about 25 s per request) and replays each program.
+RESULTS_PLACEHOLDER
+
+## Verified end to end under QEMU
+
+QEMU_PLACEHOLDER
+
+## Limits
+
+- **The model is small.** Qwen3-0.6B writes valid Glyph almost every time, but it
+  gets the shape right only for simple polygons (see the table). A larger model is
+  the fix; the loop does not depend on the model.
+- **`/draw` starts a new chat**, as `/bench` does (D28).
+- **Greedy decoding only.** `/draw` sets temperature 0 for its turn, whatever the
+  kernel was booted with, so the same request always gives the same drawing.
+- **Under TCG it is slow**: about QEMU_TIME per `/draw`. With KVM or on hardware it
+  is a few seconds.
+- Phase 4 links the same object but has no `glyph_generate` hook yet, so `/draw`
+  says it is not available there (D31).

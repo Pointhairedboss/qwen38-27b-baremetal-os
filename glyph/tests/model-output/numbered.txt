@@ -1,0 +1,4 @@
+Sure! Here you go.
+1. PENDOWN
+2. REPEAT 6 [FD 5 RT 60]
+That is a hexagon.

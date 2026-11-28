@@ -6,7 +6,8 @@
 # Phase 2: the baseline is kernel.asm as pinned upstream (6c43dec, read from
 # git); "glyph" is the current kernel.asm, whose REPL calls glyph_shell_repl.
 # Phase 4: kernel.asm is unchanged; the Glyph entry points are kept with
-# `ld -u`. This checks symbols, relocations, sections and the Multiboot
+# `ld -u`, and /draw's weak glyph_generate stays unresolved (0), so /draw
+# reports that it is not available there. This checks symbols, relocations, sections and the Multiboot
 # header. It does NOT boot anything (see qemu_inference_glyph.py for that).
 #
 # usage: tests/kernel_link.sh BUILD_DIR FORK_DIR

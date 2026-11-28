@@ -13,3 +13,8 @@ for f in tests/corpus/*.glyph examples/*.glyph; do
         cat "$f" > "$out/seed-$base"
     fi
 done
+# Model output samples (glyph extract), as whole inputs.
+for f in tests/model-output/*.txt; do
+    [ -f "$f" ] || continue
+    cat "$f" > "$out/model-$(basename "$f" .txt)"
+done

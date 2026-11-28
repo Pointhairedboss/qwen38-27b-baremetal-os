@@ -143,6 +143,24 @@ python3 -I glyph/tests/qemu_inference_glyph.py models/qwen3-0.6b-q8_0.asmbin
 python3 -I glyph/tools/qemu_showcase.py models/qwen3-0.6b-q8_0.asmbin   # records the GIF
 ```
 
+### `/draw`: the model writes Glyph, the kernel draws it
+
+```
+asm-llm> /draw a hexagon
+[draw] asking the model for a Glyph program
+a hexagon: REPEAT 6 [FD 10 RT 60]
+[draw] drawing it (ESC returns)
+```
+
+The model's reply streams to the screen. Glyph then pulls the program out of it
+(`glyph_extract` drops prose, Markdown and labels) and checks it like any other
+untrusted source. If the program has an error, the error goes back to the model
+for a fix, at most twice. Then the program runs on VGA until ESC. The kernel side
+is one function, `glyph_generate`, that sets up a turn the way `/bench` does.
+docs/DRAW.md has the details, the prompt, and how it was chosen.
+
+DRAW_README_PLACEHOLDER
+
 Not yet done: a run on P510 hardware, the fork's full `scripts/verify_os.py`
 parity suite (it needs KVM), and the Phase 4 kernel (`docs/BACKEND.md` §4–5).
 
@@ -161,7 +179,7 @@ make valgrind        # same, under valgrind memcheck
 make fuzz            # libFuzzer + ASan + UBSan, FUZZ_SECONDS=60 by default
 make freestanding    # core compiled with kernel flags; proves zero external symbols
 make baremetal-link  # core + adapter linked against ../02-* and ../04-*/drivers.asm
-make kernel-link     # full link of the unmodified Phase 2 and Phase 4 kernels with Glyph
+make kernel-link     # full link of the Phase 2 and Phase 4 kernels with Glyph (Phase 2 as pinned and as changed)
 make reference       # Turing machines, Rule 110, recursion checked against Python (python3)
 make screenshots     # regenerate docs/screenshots (Xvfb, xterm, xdotool, ImageMagick)
 make qemu-test       # boot the Glyph kernel in QEMU, compare 55 transcripts with the host (qemu-system-x86)
@@ -179,6 +197,7 @@ make check-all       # everything except fuzz
 ./build/glyph replay examples/demo.glyph examples/demo.events   # scripted session transcript
 ./build/glyph test tests/corpus                  # conformance corpus
 ./build/glyph dump examples/demo.glyph           # compiled bytecode, units, components, globals
+./build/glyph extract tests/model-output/fenced.txt   # the program in a model's reply (docs/DRAW.md)
 ./build/glyph limits                             # compiled-in limits and sizeof(glyph_vm)
 ```
 
@@ -189,22 +208,25 @@ make check-all       # everything except fuzz
 | `include/glyph.h` | Core API: load, start, inputs, render, state introspection |
 | `include/glyph_backend.h` | Backend interface, shared runner, conformance harness |
 | `include/glyph_limits.h` | Every resource limit |
-| `src/core/` | Shared core: `lex`, `parse` (compiler to bytecode), `exec` (stack VM), `turtle`, `ui`, `runner`, `script`, `util` |
+| `src/core/` | Shared core: `lex`, `parse` (compiler to bytecode), `exec` (stack VM), `turtle`, `ui`, `runner`, `script`, `extract` (programs out of model replies), `util` |
 | `src/host/` | Linux CLI (`main.c`) and terminal backend (`term.c`) |
-| `src/baremetal/` | Bare-metal adapter (`glyph_bm.c`), stack-aligning NASM shims, and `glyph_os.c` (`kernel_main` of the bootable Glyph kernel) |
+| `src/baremetal/` | Bare-metal adapter (`glyph_bm.c`), stack-aligning NASM shims, `glyph_os.c` (`kernel_main` of the bootable Glyph kernel), the inference-kernel REPL hook (`glyph_repl.c`), the `/draw` loop (`glyph_draw.c`) and its model-text helper (`glyph_model.asm`) |
 | `tests/unit.c` | Unit tests, one section per required category |
 | `tests/corpus/` | Shared conformance corpus: `.glyph` + `.events` → `.expect` transcript |
 | `tests/fuzz.c` | libFuzzer target (program + event script) |
 | `tests/kernel_link.sh` | Kernel link check for Phase 2 and Phase 4 |
 | `tests/reference/check_tc.py` | Independent Python checks of the Turing machine, Rule 110 and recursion results |
 | `tests/qemu_conformance.py` | Boots the Glyph kernel in QEMU and compares its COM1 transcripts with the host's |
-| `tools/` | `mkpayload.sh` (embeds programs in the kernel), `screenshots.sh`, `qemu_shots.py` |
+| `tests/qemu_inference_glyph.py`, `tests/qemu_draw.py` | Boot the inference kernel with the real model in QEMU: `/glyph`, `/glyphtest`, `/draw` against the Linux build (`tests/qemu_kernel.py` is the shared harness) |
+| `tests/model-output/` | Sample model replies, used as fuzz seeds for `glyph_extract` |
+| `tools/` | `mkpayload.sh` (embeds programs in the kernel), `screenshots.sh`, `qemu_shots.py`, `qemu_showcase.py` (GIFs), `draw_primer.txt`/`draw_repair.txt` (the `/draw` prompts) and `draw_eval.py` (scores them on Linux) |
 | `examples/` | Example programs; each has an expected transcript and is tested |
 | `docs/screenshots/` | Screenshots of real sessions (`tools/screenshots.sh`) |
 | `docs/SPEC.md` | Language specification |
 | `docs/ARCHITECTURE.md` | Modules, memory, determinism, untrusted input, embedding API |
 | `docs/BACKEND.md` | Backend interface, fork driver ABI, bare-metal integration notes |
 | `docs/DECISIONS.md` | Design decisions, bootLogo deviations, known limitations, next milestones |
+| `docs/DRAW.md` | `/draw`: how the model's reply becomes a drawing, the prompt and how it was chosen |
 | `NOTICE` | Provenance and the bootLogo licence |
 
 ## Examples

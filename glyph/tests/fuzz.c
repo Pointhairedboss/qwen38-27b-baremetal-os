@@ -3,7 +3,9 @@
  * Input layout: PROGRAM [ "\n%%\n" SCRIPT ]. The program is loaded, started
  * and driven by the event script through glyph_transcript; then every script
  * byte is also delivered as a raw key. Invariants are asserted after each
- * step. Build/run: `make fuzz` (clang, ASan, UBSan).
+ * step. The whole input is also treated as model output for glyph_extract:
+ * the result must be NUL-terminated, no longer than the input, and load
+ * again on its own when extraction succeeds. Build/run: `make fuzz` (clang, ASan, UBSan).
  */
 #include <stdint.h>
 #include <stdlib.h>
@@ -14,6 +16,7 @@
 
 static glyph_vm vm;
 static char out[1 << 16];
+static char extracted[GLYPH_MAX_SOURCE + 2];
 
 static void sink(void *u, int y, const glyph_cell *c, int w)
 {
@@ -39,6 +42,16 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     glyph_buf b;
     glyph_result r;
 
+    {
+        size_t xn = 12345;
+        glyph_diag d;
+        int e = glyph_extract(&vm, src, size, extracted, sizeof extracted, &xn, &d);
+        if (e < 0 || e >= GLYPH_CODE_COUNT) abort();
+        if (e != GLYPH_E_SOURCE_SIZE) {
+            if (xn > size + 1 || extracted[xn] != 0) abort();
+            if (e == GLYPH_OK && glyph_load(&vm, extracted, xn, &d) != GLYPH_OK) abort();
+        }
+    }
     for (i = 0; i + 4 <= size; i++) {
         if (memcmp(data + i, "\n%%\n", 4) == 0) {
             n = i;
