@@ -159,7 +159,8 @@ for a fix, at most twice. Then the program runs on VGA until ESC. The kernel sid
 is one function, `glyph_generate`, that sets up a turn the way `/bench` does.
 docs/DRAW.md has the details, the prompt, and how it was chosen.
 
-DRAW_README_PLACEHOLDER
+The end-to-end QEMU check with the real model (`tests/qemu_draw.py`) is running;
+its results will be recorded here.
 
 Not yet done: a run on P510 hardware, the fork's full `scripts/verify_os.py`
 parity suite (it needs KVM), and the Phase 4 kernel (`docs/BACKEND.md` §4–5).

@@ -99,11 +99,12 @@ about 5 seconds.
 
 `tools/draw_eval.py` runs the `/draw` loop on the Linux build (`build/asm-llm`,
 token-identical to the kernel, about 25 s per request) and replays each program.
-RESULTS_PLACEHOLDER
+The measured comparison of the candidate prompts will be recorded here.
 
 ## Verified end to end under QEMU
 
-QEMU_PLACEHOLDER
+`tests/qemu_draw.py` checks `/draw` in the kernel against the Linux reference;
+its results will be recorded here.
 
 ## Limits
 
@@ -113,7 +114,7 @@ QEMU_PLACEHOLDER
 - **`/draw` starts a new chat**, as `/bench` does (D28).
 - **Greedy decoding only.** `/draw` sets temperature 0 for its turn, whatever the
   kernel was booted with, so the same request always gives the same drawing.
-- **Under TCG it is slow**: about QEMU_TIME per `/draw`. With KVM or on hardware it
+- **Under TCG it is slow**: several minutes per `/draw` (about 5 s per token). With KVM or on hardware it
   is a few seconds.
 - Phase 4 links the same object but has no `glyph_generate` hook yet, so `/draw`
   says it is not available there (D31).
