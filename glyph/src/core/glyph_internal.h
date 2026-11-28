@@ -38,6 +38,7 @@ enum {
     OP_NEG, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_REM,
     OP_EQ, OP_NE, OP_LESS, OP_GREATER, OP_LESSEQ, OP_GREATEREQ,
     OP_AND, OP_OR, OP_NOT, OP_WORD,
+    OP_NUMBER, OP_NUMBERP, /* text to integer; is it a number (1/0) */
     OP_XCOR, OP_YCOR, OP_HEADING,
     OP_CALLV,      /* arg = procedure sym; reporter call (1 step) */
     /* control (free) */

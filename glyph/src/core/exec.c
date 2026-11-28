@@ -247,6 +247,43 @@ static int word(glyph_vm *vm, const glyph_insn *in, glyph_diag *d)
     return GLYPH_OK;
 }
 
+/* NUMBER / NUMBERP: an integer, or a string that holds one: optional spaces,
+ * an optional sign, decimal digits, optional spaces. Saturates at
+ * +-GLYPH_INT_MAX like all arithmetic. Returns 0 if v is not a number. */
+static int to_number(const glyph_value *v, int32_t *out)
+{
+    int i = 0, digits = 0, neg = 0;
+    int64_t r = 0;
+    if (v->type == GLYPH_T_INT) { *out = v->i; return 1; }
+    while (i < v->len && v->s[i] == ' ') i++;
+    if (i < v->len && (v->s[i] == '-' || v->s[i] == '+')) neg = v->s[i++] == '-';
+    for (; i < v->len && v->s[i] >= '0' && v->s[i] <= '9'; i++, digits++)
+        if (r <= GLYPH_INT_MAX) r = r * 10 + (v->s[i] - '0');   /* stays within int64 */
+    while (i < v->len && v->s[i] == ' ') i++;
+    if (digits == 0 || i != v->len) return 0;
+    if (r > GLYPH_INT_MAX) r = GLYPH_INT_MAX;
+    *out = (int32_t)(neg ? -r : r);
+    return 1;
+}
+
+static int number(glyph_vm *vm, const glyph_insn *in, glyph_diag *d)
+{
+    glyph_value *v;
+    int32_t x = 0;
+    int ok;
+    glyph_buf b;
+    TRY(pop_n(vm, in, 1, &v, d));
+    ok = to_number(v, &x);
+    if (in->op == OP_NUMBERP) return push_int(vm, in, ok, d);
+    if (ok) return push_int(vm, in, x, d);
+    d->code = GLYPH_E_TYPE; d->line = in->line; d->col = in->col;
+    glyph_buf_init(&b, d->msg, sizeof d->msg);
+    glyph_buf_str(&b, "NUMBER: \"");
+    glyph_buf_mem(&b, v->s, v->len > 24 ? 24 : v->len);
+    glyph_buf_str(&b, v->len > 24 ? "...\" is not a number" : "\" is not a number");
+    return GLYPH_E_TYPE;
+}
+
 static int array_index(glyph_vm *vm, const glyph_insn *in, int32_t idx, int *cell, glyph_diag *d)
 {
     const glyph_array *a = &vm->arrays[in->arg];
@@ -318,6 +355,7 @@ int exec_entry(glyph_vm *vm, int unit, glyph_diag *d)
             break;
         }
         case OP_WORD: TRY(word(vm, in, d)); break;
+        case OP_NUMBER: case OP_NUMBERP: TRY(number(vm, in, d)); break;
         case OP_XCOR: TRY(push_int(vm, in, canvas_round(vm->tx), d)); break;
         case OP_YCOR: TRY(push_int(vm, in, canvas_round(vm->ty), d)); break;
         case OP_HEADING: TRY(push_int(vm, in, vm->heading, d)); break;
